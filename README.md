@@ -10,6 +10,11 @@ and play experience for setting up the development environment. To get all the c
 First, complete the [basic Rust setup instructions](./docs/rust-setup.md).
 
 ### Run
+Note: Some libraries only work with Rust nightly. Kindly build with rust nightly as default
+
+```sh
+rustup default nightly
+```
 
 To build and launch, run bash script
 
