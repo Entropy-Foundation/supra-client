@@ -1,14 +1,5 @@
 # Substrate Node Template
 
-[![Try on playground](https://img.shields.io/badge/Playground-Node_Template-brightgreen?logo=Parity%20Substrate)](https://playground.substrate.dev/?deploy=node-template)
-
-A fresh FRAME-based [Substrate](https://www.substrate.io/) node, ready for hacking :rocket:
-
-## Getting Started
-
-Follow the steps below to get started with the Node Template, or get it up and running right from your browser
-in just a few clicks using [Playground](https://playground.substrate.dev/) :hammer_and_wrench:
-
 ### Using Nix
 
 Install [nix](https://nixos.org/) and optionally [direnv](https://github.com/direnv/direnv) and [lorri](https://github.com/target/lorri) for a fully plug
@@ -20,10 +11,10 @@ First, complete the [basic Rust setup instructions](./docs/rust-setup.md).
 
 ### Run
 
-Use Rust's native `cargo` command to build and launch the template node:
+To build and launch, run bash script
 
 ```sh
-cargo run --release -- --dev --tmp
+./run-parts.sh
 ```
 
 ### Build
