@@ -42,6 +42,8 @@ use pallet_transaction_payment::CurrencyAdapter;
 /// Import the template pallet.
 pub use pallet_template;
 
+pub use client;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -270,6 +272,68 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+impl client::Config for Runtime {
+	type AuthorityId = client::crypto::SupraAuthId;
+	type Event = Event;
+	type Call = Call;
+}
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
+where
+    Call: From<LocalCall>,
+{
+    fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+        call: Call,
+        public: <Signature as sp_runtime::traits::Verify>::Signer,
+        account: AccountId,
+        index: Index,
+    ) -> Option<(
+        Call,
+        <UncheckedExtrinsic as sp_runtime::traits::Extrinsic>::SignaturePayload,
+    )> {
+        let period = BlockHashCount::get() as u64;
+        let current_block = System::block_number()
+            .saturated_into::<u64>()
+            .saturating_sub(1);
+        let tip = 0;
+        let extra: SignedExtra = (
+            frame_system::CheckTxVersion::<Runtime>::new(),
+            frame_system::CheckGenesis::<Runtime>::new(),
+            frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
+            frame_system::CheckNonce::<Runtime>::from(index),
+            frame_system::CheckWeight::<Runtime>::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+        );
+
+        #[cfg_attr(not(feature = "std"), allow(unused_variables))]
+        let raw_payload = SignedPayload::new(call, extra)
+            .map_err(|e| {
+                debug::native::warn!("SignedPayload error: {:?}", e);
+            })
+            .ok()?;
+
+        let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
+
+        let address = account;
+        let (call, extra, _) = raw_payload.deconstruct();
+        Some((call, (address, signature, extra)))
+    }
+}
+
+impl frame_system::offchain::SigningTypes for Runtime {
+	type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+	type Signature = Signature;
+  }
+  
+  impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+  where
+	Call: From<C>,
+  {
+	type OverarchingCall = Call;
+	type Extrinsic = UncheckedExtrinsic;
+  }
+  
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -287,6 +351,8 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
+		LightClient: client::{Module, Call, Storage, Event}
+
 	}
 );
 
