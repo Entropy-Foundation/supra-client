@@ -4,7 +4,7 @@ use core::{convert::TryInto, fmt};
 use frame_support::{
 	debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult,
 };
-use parity_scale_codec::{Decode, Encode};
+use parity_scale_codec::{Encode, Decode};
 
 use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
 		AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
@@ -117,7 +117,7 @@ decl_event!(
 	{
         /// Event generated when a new number is accepted to contribute to the average.
 		NewNumber(Option<AccountId>, u64),
-		GetCurrentPrice(Option<AccountId>, String),
+		// GetCurrentPrice(Option<AccountId>, String),
 	}
 );
 
