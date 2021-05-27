@@ -1,4 +1,4 @@
-# Substrate Node Template
+# Supra (Modified Substrate)
 
 ### Using Nix
 
