@@ -352,7 +352,7 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
-		LightClient: client::{Module, Call, Storage, Event<T>}
+		LightClient: client::{Module, Call, Storage, Event<T>, ValidateUnsigned}
 
 	}
 );

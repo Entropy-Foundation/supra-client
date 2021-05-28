@@ -28,6 +28,7 @@ use sp_runtime::traits::{BlakeTwo256, Block};
 use sp_std::{collections::vec_deque::VecDeque, prelude::*, str};
 
 use serde::{Deserialize, Deserializer};
+// use sc_client_api::client;
 
 pub type BlockNumber = u32;
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
@@ -41,7 +42,7 @@ const NUM_VEC_LEN: usize = 10;
 const UNSIGNED_TXS_PRIORITY: u64 = 100;
 
 // TODO: api request
-const HTTP_REMOTE_REQUEST: &str = "https://apis.ankr.com/f19edf663ca94d8597d9e73f5e9583ae/6a6237639bc6e8cc7f5a5fd0cdc8451b/eth/fast/main";
+const HTTP_REMOTE_REQUEST: &str = "https://api.pro.coinbase.com/products/ETH-USD/ticker";
 
 const HTTP_HEADER_USER_AGENT: &str = "jaminu71@gmail.com";
 
@@ -117,6 +118,10 @@ decl_event!(
 	{
         /// Event generated when a new number is accepted to contribute to the average.
 		NewNumber(Option<AccountId>, u64),
+		/// Event fetching etherium price done and transaction made to ethereum.
+		UpdateEthereumPrice(Option<AccountId>),
+		/// Event submit etherium price done.
+		SubmitEthereumPrice(Option<AccountId>, Vec<u8>),
 		// GetCurrentPrice(Option<AccountId>, String),
 	}
 );
@@ -138,6 +143,9 @@ decl_error! {
         
 		// Error returned when fetching github info
 		HttpFetchingError,
+
+		// Error if not parsed in given struct
+		HttpNotParsedInStruct,
 	}
 }
 
@@ -164,6 +172,8 @@ decl_module! {
             let _ = ensure_none(origin)?;
 			debug::info!("submit_number_unsigned: {}", number);
 			Self::append_or_replace_number(number);
+
+			debug::info!("unsigned Block Number: {:?}",frame_system::Module::<T>::block_number());
             
 			// Off-chain indexing write
 			let key = Self::derived_key(frame_system::Module::<T>::block_number());
@@ -193,9 +203,41 @@ decl_module! {
             Self::deposit_event(RawEvent::NewNumber(None, number));
 			Ok(())
 		}
+
+		#[weight = 10000]
+		pub fn submit_ethereum_price(origin,ethereum_price: Vec<u8>) -> DispatchResult{
+
+			let who = ensure_signed(origin)?;
+			
+			debug::info!("updated ethereum price: ({:?}, {:?})", ethereum_price, who);
+			// debug::info!("inserted data {:?}", ethereum_price.to_vec());
+
+			let key = Self::derived_key(frame_system::Module::<T>::block_number());
+			let data = IndexingPriceData(b"submit_ethereum_price".to_vec(), ethereum_price.to_vec());
+			offchain_index::set(&key, &data.encode());
+
+			Self::deposit_event(RawEvent::SubmitEthereumPrice(None,ethereum_price));
+			Ok(())
+		}
+
+		#[weight = 10000]
+		pub fn update_ethereum_price(origin) -> DispatchResult{
+
+			let who = ensure_signed(origin)?;
+			
+			debug::info!("Block Number: {:?}",frame_system::Module::<T>::block_number());
+
+			let key = Self::derived_key(frame_system::Module::<T>::block_number());
+			let data = IndexingPriceFlag(b"update_ethereum_price".to_vec());
+			offchain_index::set(&key, &data.encode());
+
+			Self::deposit_event(RawEvent::UpdateEthereumPrice(Some(who)));
+			Ok(())
+		}
         
 		fn offchain_worker(block_number: T::BlockNumber) {
             debug::info!("Entering off-chain worker");
+			debug::info!("off chain block number: {:?}", block_number);
 
 			// Here we are showcasing various techniques used when running off-chain workers (ocw)
 			// 1. Sending signed transaction from ocw
@@ -225,6 +267,20 @@ decl_module! {
                 str::from_utf8(&data.0).unwrap_or("error"), data.1);
 			} else {
                 debug::info!("no off-chain indexing data retrieved.");
+			}
+
+			if let Some(Some(data)) = oci_mem.get::<IndexingPriceFlag>() {
+				let tran_name = str::from_utf8(&data.0).unwrap_or("error");
+				if tran_name == "update_ethereum_price" {
+					let result = Self::update_ethereum_price_worker();
+					if let Err(e) = result {
+						debug::error!("offchain_worker ethereum error: {:?}", e);
+					}
+				}
+                debug::info!("off-chain ethereum indexing data: {:?}",
+                str::from_utf8(&data.0).unwrap_or("error"));
+			} else {
+                debug::info!("no off-chain ethereum indexing data retrieved.");
 			}
 		}
 
@@ -258,6 +314,69 @@ impl<T: Config> Module<T> {
             .copied()
             .collect::<Vec<u8>>()
 		})
+	}
+
+	pub fn update_ethereum_price_worker() -> Result<(), Error<T>> {
+
+		// let signer = Signer::<T, T::AuthorityId>::any_account();
+        
+		// let number: u64 = block_number.try_into().unwrap_or(0);
+
+		let s_info = StorageValueRef::persistent(b"ocw-demo::ethereum-info");
+
+		let mut lock = StorageLock::<BlockAndTime<Self>>::with_block_and_time_deadline(
+            b"ocw-demo::lock",
+			LOCK_BLOCK_EXPIRATION,
+			rt_offchain::Duration::from_millis(LOCK_TIMEOUT_EXPIRATION),
+		);
+
+		if let Ok(_guard) = lock.try_lock() {
+			match Self::fetch_n_parse() {
+				Ok(data) => {
+                    s_info.set(&data);
+				}
+				Err(err) => {
+                    return Err(err);
+				}
+			}
+		}
+		
+		let final_price:Vec<u8>;
+		if let Some(Some(ethereum_price_data)) = s_info.get::<LightClient>() {
+			final_price = ethereum_price_data.price;	
+		} else {
+			final_price = "0".into();
+		}
+
+		// Ok(())
+
+		let call = Call::submit_ethereum_price(final_price.clone());
+        
+		// `submit_unsigned_transaction` returns a type of `Result<(), ()>`
+		//   ref: https://substrate.dev/rustdocs/v3.0.0/frame_system/offchain/struct.SubmitTransaction.html#method.submit_unsigned_transaction
+		SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
+            debug::error!("Failed in update_ethereum_price_worker");
+			<Error<T>>::OffchainUnsignedTxError
+		})
+		
+		// let result = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(|_acct|
+		// 	// This is the on-chain function
+		// 	Call::submit_ethereum_price(final_price.clone())
+		// );
+			
+		// 	// Display error if the signed tx fails.
+		// if let Some((acc, res)) = result {
+		// 	if res.is_err() {
+		// 		debug::error!("failure: offchain_signed_tx: tx sent: {:?}", acc.id);
+		// 		return Err(<Error<T>>::OffchainSignedTxError);
+		// 	}
+		// 	// Transaction is sent successfully
+		// 	return Ok(());
+		// } else {
+		// 	// The case result == `None`: no account is available for sending
+		// 	debug::error!("No local account available");
+		// 	return Err(<Error<T>>::NoLocalAcctForSigning);
+		// }
 	}
     
 	/// Check if we have data before. If yes, we can use the cached version
@@ -314,7 +433,7 @@ impl<T: Config> Module<T> {
 
 		// Deserializing JSON to struct, thanks to `serde` and `serde_derive`
 		let data: LightClient =
-        serde_json::from_str(&resp_str).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        serde_json::from_str(&resp_str).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
 		Ok(data)
 	}
 
@@ -333,6 +452,7 @@ impl<T: Config> Module<T> {
 		// For whatever API request, we also need to specify `user-agent` in http request header.
 		let pending = request
         .add_header("User-Agent", HTTP_HEADER_USER_AGENT)
+		// .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
         .deadline(timeout) // Setting the timeout time
         .send() // Sending the request out by the host
         .map_err(|_| <Error<T>>::HttpFetchingError)?;
@@ -436,6 +556,8 @@ impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
                     }
                     valid_tx(b"submit_number_unsigned_with_signed_payload".to_vec())
                 },
+
+				Call::submit_ethereum_price(_ethereum_price) => valid_tx(b"submit_ethereum_price".to_vec()),
                 
                 _ => InvalidTransaction::Call.into(),
             }
@@ -452,13 +574,30 @@ impl<T: Config> rt_offchain::storage_lock::BlockNumberProvider for Module<T> {
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
 struct IndexingData(Vec<u8>, u64);
 
+#[derive(Debug, Deserialize, Encode, Decode, Default)]
+struct IndexingPriceData(Vec<u8>, Vec<u8>);
+
+#[derive(Debug, Deserialize, Encode, Decode, Default)]
+struct IndexingPriceFlag(Vec<u8>);
+
 #[derive(Deserialize, Encode, Decode, Default)]
 struct LightClient {
     // Specify our own deserializing function to convert JSON string to vector of bytes
 	// #[serde(deserialize_with = "de_string_to_bytes")]
-	header: Vec<u8>,
-	block: u8,
-    public_repos: u32,
+	// header: Vec<u8>,
+	// block: u8,
+    // public_repos: u32,
+	// {"trade_id":123560925,"price":"2726.25","size":"0.07600729","time":"2021-05-27T06:28:47.05024Z","bid":"2726.73","ask":"2726.74","volume":"517961.94817769"}
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	price: Vec<u8>,
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	time: Vec<u8>,
+}
+
+pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
+where D: Deserializer<'de> {
+    let s: &str = Deserialize::deserialize(de)?;
+    Ok(s.as_bytes().to_vec())
 }
 
 impl fmt::Debug for LightClient {
@@ -467,9 +606,11 @@ impl fmt::Debug for LightClient {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(
 			f,
-			"{{ header: {}, block: {} }}",
-			str::from_utf8(&self.header).map_err(|_| fmt::Error)?,
-			&self.block,
+			"{{ price: {}, time: {} }}",
+			// &self.price,
+			str::from_utf8(&self.price).map_err(|_| fmt::Error)?,
+			str::from_utf8(&self.time).map_err(|_| fmt::Error)?,
+			// &self.time,
 		)
 	}
 }
