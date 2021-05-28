@@ -57,3 +57,4 @@ node-template-runtime = { path = '../runtime', version = '3.0.0' }
 [features]
 default = []
 runtime-benchmarks = ['node-template-runtime/runtime-benchmarks']
+light-client = []

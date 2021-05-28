@@ -16,3 +16,4 @@
 .direnv
 
 Cargo.toml
+Cargo.lock
