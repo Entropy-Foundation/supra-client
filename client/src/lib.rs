@@ -357,7 +357,7 @@ impl<T: Config> Module<T> {
 			final_price = "0".into();
 		}
 
-		let result = Self::submt_price_to_ethereum(final_price.clone());
+		let _result = Self::submt_price_to_ethereum(final_price.clone());
 
 		// Ok(())
 
@@ -489,7 +489,7 @@ impl<T: Config> Module<T> {
 		let price_float = price_in_string.parse::<f32>().map_err(|_| <Error<T>>::ParseFloatError)?;
 		debug::info!("Price in float{:?}",price_float);
 
-		let body = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[],\"id\":1}";
+		let _body = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[],\"id\":1}";
 
 		// let request = rt_offchain::http::Request::get(HTTP_ETHEREUM_HOST, body);
         
