@@ -13,6 +13,8 @@ readme = "README.md"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
+#getrandom = { version = "0.2.*", features = ["js"] }
+#web3 = "0.15.0"
 parking_lot = '0.11'
 serde = { version = '1.0.100', default-features = false, features = ['derive'] }
 serde_json = { version = '1.0.45', default-features = false, features = ['alloc'] }
@@ -25,6 +27,9 @@ sp-io = { version = '3.0', default-features = false }
 sp-runtime = { version = '3.0', default-features = false }
 sp-std = { version = '3.0', default-features = false }
 sp-keystore = { version = '0.9', optional = true }
+web3-rs-wasm = { path = "../../web3-rs-wasm" }
+#web3 = { path = "../../rust-web3" }
+
 [dependencies.parity-scale-codec]
 default-features = false
 features = ['derive']
