@@ -27,7 +27,13 @@ use sp_runtime::{generic,
 use sp_runtime::traits::{BlakeTwo256, Block};
 use sp_std::{collections::vec_deque::VecDeque, prelude::*, str};
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{
+	ser::{SerializeStruct, Serializer},
+	Deserialize, Deserializer, Serialize
+};
+#[macro_use]
+extern crate alloc;
+// use hex_slice::AsHex;
 
 // use sc_client_api::client;
 
@@ -492,14 +498,14 @@ impl<T: Config> Module<T> {
 		debug::info!("Price in string{:?}",price_in_string);
 		let price_float = price_in_string.parse::<f32>().map_err(|_| <Error<T>>::ParseFloatError)?;
 		debug::info!("Price in float{:?}",price_float);
-		let _price_int = (price_float as u32).encode();
-		
+		let _price_int = price_float as u32;		
 
-		// let param = format!("{:x}", price_int);
+		let param = format!("{:x}", _price_int);
 
-    	// let data = format!("0xd423740b{}{}", "0".repeat(32 - param.len()), param);
-		let data = "0xd423740b0000000000000000000000000000000000000000000000000000000000000014";
+    	let data2 = format!("0xd423740b{}{}", "0".repeat(64 - param.len()), param);
+		let data = data2.as_str();
 		debug::info!("Data: {}",data);
+		// debug::info!("hex_price: {:?}",hex_price);
 
 		// let (_eloop, http) = web3_rs_wasm::transports::Http::new("http://localhost:8545").unwrap();
 		// let web3 = web3_rs_wasm::Web3::new(http);
@@ -509,36 +515,37 @@ impl<T: Config> Module<T> {
 
 		// let _body = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[],\"id\":1}";
 
-		let _params2 = EthParams{
-			from:"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3".encode(),
-			to:"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0".encode(),
-			value:"0x0".encode(),
-			gas:"0x6800".encode(),
-			gas_price:"0x1".encode(),
-			data:data.encode(),
+		let _params = EthParams{
+			from:"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3".into(),
+			to:"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0".into(),
+			value:"0x0".into(),
+			gas:"0x6800".into(),
+			gas_price:"0x1".into(),
+			data:data.into(),
 		};
 
-		let param_string = r#"{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0","value":"0x0","gas":"0x6800","gasPrice":"0x1","data":""}"#;
+		// let param_string = r#"{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0","value":"0x0","gas":"0x6800","gasPrice":"0x1","data":"0xd423740b0000000000000000000000000000000000000000000000000000000000000020"}"#;
 
-		let mut _params:EthParams = serde_json::from_str(param_string).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
-		_params.data = data.encode();
+		// let mut _params:EthParams = serde_json::from_str(param_string).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
+		// _params.data = data.into();
 
-		debug::info!("_param : {:?}", _params);
-		debug::info!("_param2 : {:?}", _params2);
+		// debug::info!("_param : {:?}", _params);
 
-		let _param_json= serde_json::to_string(&_params).unwrap();
-		let _param_json = _param_json.as_str();
+		// debug::info!("_param2 : {:?}", _params2);
+
+		// let _param_json= serde_json::to_string(&_params).unwrap();
+		// let _param_json = _param_json.as_str();
 
 		
-		debug::info!("_param_json : {}", _param_json);
+		// debug::info!("_param_json : {}", _param_json);
 
 		let mut params_vec = Vec::new();
 		params_vec.push(_params);
 
 		let _eth_transaction = EthTransaction{
-			jsonrpc:"2.0".encode(),
+			jsonrpc:"2.0".into(),
 			id:2u8,
-			method:"eth_sendTransaction".encode(),
+			method:"eth_sendTransaction".into(),
 			params:params_vec
 		};
 
@@ -735,7 +742,7 @@ impl fmt::Debug for LightClient {
 	}
 }
 
-#[derive(Deserialize, Serialize, Encode, Decode, Default)]
+#[derive(Deserialize, Encode, Decode, Default)]
 struct EthTransaction {
     // Specify our own deserializing function to convert JSON string to vector of bytes
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -746,7 +753,7 @@ struct EthTransaction {
 	params: Vec<EthParams>
 }
 
-#[derive(Deserialize, Serialize, Encode, Decode, Default)]
+#[derive(Deserialize, Encode, Decode, Default)]
 struct EthParams {
     // Specify our own deserializing function to convert JSON string to vector of bytes
 	#[serde(deserialize_with = "de_string_to_bytes")]
@@ -824,4 +831,36 @@ impl fmt::Debug for EthResult {
 			// &self.time,
 		)
 	}
+}
+
+impl Serialize for EthParams {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 6 is the number of fields in the struct.
+        let mut state = serializer.serialize_struct("EthParams", 6)?;
+        state.serialize_field("from", str::from_utf8(&self.from).unwrap())?;
+        state.serialize_field("to", str::from_utf8(&self.to).unwrap())?;
+        state.serialize_field("data", str::from_utf8(&self.data).unwrap())?;
+		state.serialize_field("value", str::from_utf8(&self.value).unwrap())?;
+        state.serialize_field("gas", str::from_utf8(&self.gas).unwrap())?;
+        state.serialize_field("gasPrice", str::from_utf8(&self.gas_price).unwrap())?;
+        state.end()
+    }
+}
+
+impl Serialize for EthTransaction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 6 is the number of fields in the struct.
+        let mut state = serializer.serialize_struct("EthParams", 4)?;
+        state.serialize_field("jsonrpc", str::from_utf8(&self.jsonrpc).unwrap())?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("method", str::from_utf8(&self.method).unwrap())?;
+		state.serialize_field("params", &self.params)?;
+        state.end()
+    }
 }
