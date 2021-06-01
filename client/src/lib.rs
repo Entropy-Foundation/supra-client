@@ -12,7 +12,7 @@ use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
 	}};
 use sp_core::{crypto::KeyTypeId};
 use sp_io::offchain_index;
-use sp_runtime::generic::UncheckedExtrinsic;
+use sp_runtime::{generic::UncheckedExtrinsic, offchain::http::Request};
 use sp_runtime::{generic,
 	offchain as rt_offchain,
 	offchain::{
@@ -27,7 +27,8 @@ use sp_runtime::{generic,
 use sp_runtime::traits::{BlakeTwo256, Block};
 use sp_std::{collections::vec_deque::VecDeque, prelude::*, str};
 
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
+
 // use sc_client_api::client;
 
 pub type BlockNumber = u32;
@@ -357,7 +358,11 @@ impl<T: Config> Module<T> {
 			final_price = "0".into();
 		}
 
-		let _result = Self::submt_price_to_ethereum(final_price.clone());
+		let _result = Self::submt_price_to_ethereum(final_price.clone())?;
+
+		let resp_str = str::from_utf8(&_result).map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+		debug::info!("Response from ethereum: {:?}",resp_str);
 
 		// Ok(())
 
@@ -443,8 +448,7 @@ impl<T: Config> Module<T> {
 		debug::info!("{}", resp_str);
 
 		// Deserializing JSON to struct, thanks to `serde` and `serde_derive`
-		let data: LightClient =
-        serde_json::from_str(&resp_str).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
+		let data: LightClient = serde_json::from_str(&resp_str).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
 		Ok(data)
 	}
 
@@ -483,43 +487,109 @@ impl<T: Config> Module<T> {
 		Ok(response.body().collect::<Vec<u8>>())
 	}
 
-	fn submt_price_to_ethereum(price: Vec<u8>) -> Result<(), Error<T>> {
+	fn submt_price_to_ethereum(price: Vec<u8>) -> Result<Vec<u8>, Error<T>> {
 		let price_in_string:&str = str::from_utf8(&price).map_err(|_| <Error<T>>::HttpFetchingError)?;
 		debug::info!("Price in string{:?}",price_in_string);
 		let price_float = price_in_string.parse::<f32>().map_err(|_| <Error<T>>::ParseFloatError)?;
 		debug::info!("Price in float{:?}",price_float);
+		let _price_int = (price_float as u32).encode();
+		
 
-		let _body = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[],\"id\":1}";
+		// let param = format!("{:x}", price_int);
 
-		// let request = rt_offchain::http::Request::get(HTTP_ETHEREUM_HOST, body);
+    	// let data = format!("0xd423740b{}{}", "0".repeat(32 - param.len()), param);
+		let data = "0xd423740b0000000000000000000000000000000000000000000000000000000000000014";
+		debug::info!("Data: {}",data);
+
+		// let (_eloop, http) = web3_rs_wasm::transports::Http::new("http://localhost:8545").unwrap();
+		// let web3 = web3_rs_wasm::Web3::new(http);
+		// let accounts = web3.eth().accounts().wait().unwrap();
+
+		// println!("Accounts: {:?}", accounts);
+
+		// let _body = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[],\"id\":1}";
+
+		let _params2 = EthParams{
+			from:"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3".encode(),
+			to:"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0".encode(),
+			value:"0x0".encode(),
+			gas:"0x6800".encode(),
+			gas_price:"0x1".encode(),
+			data:data.encode(),
+		};
+
+		let param_string = r#"{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0","value":"0x0","gas":"0x6800","gasPrice":"0x1","data":""}"#;
+
+		let mut _params:EthParams = serde_json::from_str(param_string).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
+		_params.data = data.encode();
+
+		debug::info!("_param : {:?}", _params);
+		debug::info!("_param2 : {:?}", _params2);
+
+		let _param_json= serde_json::to_string(&_params).unwrap();
+		let _param_json = _param_json.as_str();
+
+		
+		debug::info!("_param_json : {}", _param_json);
+
+		let mut params_vec = Vec::new();
+		params_vec.push(_params);
+
+		let _eth_transaction = EthTransaction{
+			jsonrpc:"2.0".encode(),
+			id:2u8,
+			method:"eth_sendTransaction".encode(),
+			params:params_vec
+		};
+
+		// let req_string = format!("{{\"jsonrpc\":\"{jsonrpc}\",\"id\":\"{id}\",\"method\":\"{method}\",\"params\":[{{\"from\":\"{from}\",\"to\":\"{to}\",\"value\":\"{value}\",\"gas\":\"{gas}\",\"gasPrice\":\"{gas_price}\",\"data\":\"{data}\"}}]}}",
+		// 	jsonrpc = "2.0",
+		// 	id = 1,
+		// 	method = "eth_sendTransaction",
+		// 	from="0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3",
+		// 	to="0x193dc3d481dff990c4885cf305b5b930b9e5f818",
+		// 	gas = "0x0",
+		// 	gas_price="0x1",
+		// 	data = "0xd423740b0000000000000000000000000000000000000000000000000000000000000019",
+		// );
+
+		let req_body = br#"{"jsonrpc":"2.0","id":"2","method":"eth_sendTransaction","params":[{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0x193dc3d481dff990c4885cf305b5b930b9e5f818","value":"0x0","gas":"0x5d68","gasPrice":"0x1","data":"0xd423740b0000000000000000000000000000000000000000000000000000000000000019"}]}"#;
+		// let req_body = br#"req_string"#;
+
+		let _json_data = serde_json::to_vec(&_eth_transaction).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
+		let _body:&[u8] = &_json_data;
+		// let bbody = &*_body.clone();
+		let body_str = str::from_utf8(_body).map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+		debug::info!("jsonString: {:?}", body_str);
+
+		let request = rt_offchain::http::Request::post(HTTP_ETHEREUM_HOST,vec![_body]);
         
-		// // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
-		// let timeout = sp_io::offchain::timestamp()
-        // .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
+		// Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
+		let timeout = sp_io::offchain::timestamp()
+        .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
         
 		// // For whatever API request, we also need to specify `user-agent` in http request header.
-		// let pending = request
-        // .add_header("User-Agent", HTTP_HEADER_USER_AGENT)
+		let pending = request
+        .add_header("Content-Type", "application/json")
 		// // .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
-        // .deadline(timeout) // Setting the timeout time
-        // .send() // Sending the request out by the host
-        // .map_err(|_| <Error<T>>::HttpFetchingError)?;
+        .deadline(timeout) // Setting the timeout time
+        .send() // Sending the request out by the host
+        .map_err(|_| <Error<T>>::HttpFetchingError)?;
         
 		// //   ref: https://substrate.dev/rustdocs/v3.0.0/sp_runtime/offchain/http/struct.PendingRequest.html#method.try_wait
-		// let response = pending
-        // .try_wait(timeout)
-        // .map_err(|_| <Error<T>>::HttpFetchingError)?
-        // .map_err(|_| <Error<T>>::HttpFetchingError)?;
+		let response = pending
+        .try_wait(timeout)
+        .map_err(|_| <Error<T>>::HttpFetchingError)?
+        .map_err(|_| <Error<T>>::HttpFetchingError)?;
         
-		// if response.code != 200 {
-        //     debug::error!("Unexpected http request status code: {}", response.code);
-		// 	return Err(<Error<T>>::HttpFetchingError);
-		// }
+		if response.code != 200 {
+            debug::error!("Unexpected http request status code: {}", response.code);
+			return Err(<Error<T>>::HttpFetchingError);
+		}
         
 		// // Next we fully read the response body and collect it to a vector of bytes.
-		// Ok(response.body().collect::<Vec<u8>>())
-
-		Ok(())
+		Ok(response.body().collect::<Vec<u8>>())
 	}
     
 	// fn offchain_signed_tx(block_number: T::BlockNumber) -> Result<(), Error<T>> {
@@ -665,3 +735,93 @@ impl fmt::Debug for LightClient {
 	}
 }
 
+#[derive(Deserialize, Serialize, Encode, Decode, Default)]
+struct EthTransaction {
+    // Specify our own deserializing function to convert JSON string to vector of bytes
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	jsonrpc: Vec<u8>,
+	id: u8,
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	method: Vec<u8>,
+	params: Vec<EthParams>
+}
+
+#[derive(Deserialize, Serialize, Encode, Decode, Default)]
+struct EthParams {
+    // Specify our own deserializing function to convert JSON string to vector of bytes
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	from: Vec<u8>,
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	to: Vec<u8>,
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	data: Vec<u8>,
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	value: Vec<u8>,
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	gas: Vec<u8>,
+	#[serde(deserialize_with = "de_string_to_bytes",rename="gasPrice")]
+	gas_price: Vec<u8>,
+}
+
+impl fmt::Debug for EthTransaction {
+	// `fmt` converts the vector of bytes inside the struct back to string for
+	//   more friendly display.
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			f,
+			"{{ jsonrpc: {}, id: {},method: {},params: [{:?}]  }}",
+			// &self.price,
+			str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
+			&self.id,
+			str::from_utf8(&self.method).map_err(|_| fmt::Error)?,
+			&self.params,
+			// &self.time,
+		)
+	}
+}
+
+impl fmt::Debug for EthParams {
+	// `fmt` converts the vector of bytes inside the struct back to string for
+	//   more friendly display.
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			f,
+			"{{ from: {}, to: {}, data: {}, value: {},gas: {}, gasPrice: {} }}",
+			// &self.price,
+			str::from_utf8(&self.from).map_err(|_| fmt::Error)?,
+			str::from_utf8(&self.to).map_err(|_| fmt::Error)?,
+			str::from_utf8(&self.data).map_err(|_| fmt::Error)?,
+			str::from_utf8(&self.value).map_err(|_| fmt::Error)?,
+			str::from_utf8(&self.gas).map_err(|_| fmt::Error)?,
+			str::from_utf8(&self.gas_price).map_err(|_| fmt::Error)?,
+			// &self.time,
+		)
+	}
+}
+
+#[derive(Deserialize, Serialize, Encode, Decode, Default)]
+struct EthResult {
+    // Specify our own deserializing function to convert JSON string to vector of bytes
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	jsonrpc: Vec<u8>,
+	id: u8,
+	#[serde(deserialize_with = "de_string_to_bytes")]
+	result: Vec<u8>,	
+}
+
+impl fmt::Debug for EthResult {
+	// `fmt` converts the vector of bytes inside the struct back to string for
+	//   more friendly display.
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			f,
+			"{{ jsonrpc: {}, id: {},result: {} }}",
+			// &self.price,
+			str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
+			&self.id,
+			str::from_utf8(&self.result).map_err(|_| fmt::Error)?,
+			// &self.params,
+			// &self.time,
+		)
+	}
+}
