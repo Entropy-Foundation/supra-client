@@ -572,7 +572,7 @@ impl<T: Config> Module<T> {
 		// // For whatever API request, we also need to specify `user-agent` in http request header.
 		let pending = request
         .add_header("Content-Type", "application/json")
-        .body(vec![_body])
+        .
 		// // .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
         .deadline(timeout) // Setting the timeout time
         .send() // Sending the request out by the host

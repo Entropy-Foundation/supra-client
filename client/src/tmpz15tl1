@@ -563,7 +563,7 @@ impl<T: Config> Module<T> {
 
 		debug::info!("jsonString: {:?}", body_str);
 
-		let request = rt_offchain::http::Request::get(HTTP_ETHEREUM_HOST);
+		let request = rt_offchain::http::Request::g(HTTP_ETHEREUM_HOST,vec![_body]);
         
 		// Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
 		let timeout = sp_io::offchain::timestamp()
@@ -572,7 +572,6 @@ impl<T: Config> Module<T> {
 		// // For whatever API request, we also need to specify `user-agent` in http request header.
 		let pending = request
         .add_header("Content-Type", "application/json")
-        .body(vec![_body])
 		// // .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
         .deadline(timeout) // Setting the timeout time
         .send() // Sending the request out by the host
