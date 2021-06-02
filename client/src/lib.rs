@@ -55,6 +55,10 @@ const HTTP_HEADER_USER_AGENT: &str = "jaminu71@gmail.com";
 
 const HTTP_ETHEREUM_HOST: &str = "http://127.0.0.1:8545";
 
+const BLOCK_FROM_ACCOUNT: &str = "0x7e4dC815bd24eC3741B01471FfEfF474cd0E0aB3";
+
+const BLOCK_TO_ACCOUNT: &str = "0x85B72f750d1A22eD071e320a7Ce5fEbaA58B381d";
+
 const FETCH_TIMEOUT_PERIOD: u64 = 3000; // in milli-seconds
 const LOCK_TIMEOUT_EXPIRATION: u64 = FETCH_TIMEOUT_PERIOD + 1000; // in milli-seconds
 const LOCK_BLOCK_EXPIRATION: u32 = 3; // in block number
@@ -228,8 +232,8 @@ decl_module! {
 				let tran_name = str::from_utf8(&edata.0).unwrap_or("error");
 				if tran_name == "update_ethereum_price" {
 					let eth_host = HTTP_ETHEREUM_HOST;
-					let from_address = "0x7e4dC815bd24eC3741B01471FfEfF474cd0E0aB3";
-					let to_address = "0x85B72f750d1A22eD071e320a7Ce5fEbaA58B381d";
+					let from_address = BLOCK_FROM_ACCOUNT;
+					let to_address = BLOCK_TO_ACCOUNT;
 					debug::info!("HOST: {}, FROM: {}, TO: {}", &eth_host, &from_address, &to_address);
 					let result = Self::update_ethereum_price_worker(eth_host, from_address, to_address);
 					if let Err(e) = result {
