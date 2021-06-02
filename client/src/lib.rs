@@ -195,15 +195,17 @@ decl_module! {
 		}
 
 		#[weight = 10000]
-		pub fn update_ethereum_price(origin) -> DispatchResult{
+		pub fn update_ethereum_price(origin, eth_host:Vec<u8>, from_address:Vec<u8>, to_address:Vec<u8>) -> DispatchResult{
 
 			let who = ensure_signed(origin)?;
 			
 			debug::info!("Block Number: {:?}",frame_system::Module::<T>::block_number());
 
+			debug::info!("host: {:?}, from: {:?}, to: {:?}",eth_host, from_address, to_address);
+
 			let key = Self::derived_key(frame_system::Module::<T>::block_number());
 			// let EthPayLoad { eth_host, from_address, to_address } = eth_payload;
-			let data = IndexingPriceFlag(b"update_ethereum_price".to_vec());
+			let data = IndexingPriceFlag(b"update_ethereum_price".to_vec(), eth_host, from_address, to_address);
 			offchain_index::set(&key, &data.encode());
 
 			Self::deposit_event(RawEvent::UpdateEthereumPrice(Some(who)));
@@ -227,9 +229,20 @@ decl_module! {
 			if let Some(Some(edata)) = oci_mem.get::<IndexingPriceFlag>() {
 				let tran_name = str::from_utf8(&edata.0).unwrap_or("error");
 				if tran_name == "update_ethereum_price" {
-					let eth_host = HTTP_ETHEREUM_HOST;
-					let from_address = "0x7e4dC815bd24eC3741B01471FfEfF474cd0E0aB3";
-					let to_address = "0x85B72f750d1A22eD071e320a7Ce5fEbaA58B381d";
+
+					let eth_host = format!("0x{}",str::from_utf8(&edata.1).unwrap_or("error"));
+					let from_address = format!("0x{}",str::from_utf8(&edata.2).unwrap_or("error"));
+					let to_address = format!("0x{}",str::from_utf8(&edata.3).unwrap_or("error"));
+
+					let eth_host = eth_host.as_str();
+					let from_address = from_address.as_str();
+					let to_address = to_address.as_str();
+
+					debug::info!("host: {}, from: {}, to: {}",eth_host, from_address, to_address);
+					
+					// let eth_host = HTTP_ETHEREUM_HOST;
+					// let from_address = "0x7e4dC815bd24eC3741B01471FfEfF474cd0E0aB3";
+					// let to_address = "0xab54acC4f36D138a3f0E054aDe0354a01bF5CF25";
 					debug::info!("HOST: {}, FROM: {}, TO: {}", &eth_host, &from_address, &to_address);
 					let result = Self::update_ethereum_price_worker(eth_host, from_address, to_address);
 					if let Err(e) = result {
@@ -588,7 +601,7 @@ struct IndexingData(Vec<u8>, u64);
 struct IndexingPriceData(Vec<u8>, Vec<u8>);
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
-struct IndexingPriceFlag(Vec<u8>);
+struct IndexingPriceFlag(Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>);
 
 #[derive(Deserialize, Encode, Decode, Default)]
 struct LightClient {
