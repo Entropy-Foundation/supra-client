@@ -174,57 +174,7 @@ decl_error! {
 decl_module! {
     pub struct Module<T: Config> for enum Call where origin: T::Origin {
         fn deposit_event() = default;
-        
-		// #[weight = 10000]
-		// pub fn submit_number_signed(origin, number: u64) -> DispatchResult {
-        //     let who = ensure_signed(origin)?;
-		// 	debug::info!("submit_number_signed: ({}, {:?})", number, who);
-		// 	Self::append_or_replace_number(number);
 
-		// 	let key = Self::derived_key(frame_system::Module::<T>::block_number());
-		// 	let data = IndexingData(b"submit_number_signed".to_vec(), number);
-		// 	offchain_index::set(&key, &data.encode());
-            
-		// 	Self::deposit_event(RawEvent::NewNumber(Some(who), number));
-		// 	Ok(())
-		// }
-        
-		// #[weight = 10000]
-		// pub fn submit_number_unsigned(origin, number: u64) -> DispatchResult {
-        //     let _ = ensure_none(origin)?;
-		// 	debug::info!("submit_number_unsigned: {}", number);
-		// 	Self::append_or_replace_number(number);
-
-		// 	debug::info!("unsigned Block Number: {:?}",frame_system::Module::<T>::block_number());
-            
-		// 	// Off-chain indexing write
-		// 	let key = Self::derived_key(frame_system::Module::<T>::block_number());
-		// 	let data = IndexingData(b"submit_number_unsigned".to_vec(), number);
-		// 	offchain_index::set(&key, &data.encode());
-            
-		// 	Self::deposit_event(RawEvent::NewNumber(None, number));
-		// 	Ok(())
-		// }
-        
-		// #[weight = 10000]
-		// pub fn submit_number_unsigned_with_signed_payload(origin, payload: Payload<T::Public>,
-		// 	_signature: T::Signature) -> DispatchResult
-        //     {
-		// 	let _ = ensure_none(origin)?;
-		// 	// we don't need to verify the signature here because it has been verified in
-		// 	//   `validate_unsigned` function when sending out the unsigned tx.
-		// 	let Payload { number, public } = payload;
-		// 	debug::info!("submit_number_unsigned_with_signed_payload: ({}, {:?})", number, public);
-		// 	Self::append_or_replace_number(number);
-            
-		// 	// Off-chain indexing write
-		// 	let key = Self::derived_key(frame_system::Module::<T>::block_number());
-		// 	let data = IndexingData(b"submit_number_unsigned_with_signed_payload".to_vec(), number);
-		// 	offchain_index::set(&key, &data.encode());
-
-        //     Self::deposit_event(RawEvent::NewNumber(None, number));
-		// 	Ok(())
-		// }
 
 		#[weight = 10000]
 		pub fn submit_ethereum_price(origin,ethereum_price: Vec<u8>) -> DispatchResult{
@@ -264,29 +214,6 @@ decl_module! {
             debug::info!("Entering off-chain worker");
 			debug::info!("off chain block number: {:?}", block_number);
 
-			// let events = frame_system::Module::<T>::events();
-			// debug::info!("events:{:?}", events);
-
-			// Here we are showcasing various techniques used when running off-chain workers (ocw)
-			// 1. Sending signed transaction from ocw
-			// 2. Sending unsigned transaction from ocw
-			// 3. Sending unsigned transactions with signed payloads from ocw
-			// 4. Fetching JSON via http requests in ocw
-			// const TRANSACTION_TYPES: usize = 4;
-			// let result = match block_number.try_into().unwrap_or(0) % TRANSACTION_TYPES	{
-            //     1 => Self::offchain_signed_tx(block_number),
-			// 	2 => Self::offchain_unsigned_tx(block_number),
-			// 	3 => Self::offchain_unsigned_tx_signed_payload(block_number),
-			// 	0 => Self::listener(),
-			// 	_ => Err(Error::<T>::UnknownOffchainMux),
-			// };
-            
-			// if let Err(e) = result {
-            //     debug::error!("offchain_worker error: {:?}", e);
-			// }
-            
-			// Reading back the off-chain indexing value. It is exactly the same as reading from
-			// ocw local storage.
 			let key = Self::derived_key(block_number);
 			let oci_mem = StorageValueRef::persistent(&key);
             
@@ -315,29 +242,10 @@ decl_module! {
                 debug::info!("no off-chain ethereum indexing data retrieved.");
 			}
 		}
-
-		// #[weight = 0]
-        // pub fn my_public_function(origin, block_number: T::BlockNumber) -> DispatchResult {
-		// 	let number: u64 = block_number.try_into().unwrap_or(0);
-        //     let data = fetch_from_remote
-        //     Ok(())
-        // }
 	}
 }
 
-impl<T: Config> Module<T> {
-    /// Append a new number to the tail of the list, removing an element from the head if reaching
-	///   the bounded length.
-	// fn append_or_replace_number(number: u64) {
-    //     Numbers::mutate(|numbers| {
-    //         if numbers.len() == NUM_VEC_LEN {
-    //             let _ = numbers.pop_front();
-	// 		}
-	// 		numbers.push_back(number);
-	// 		debug::info!("Number vector: {:?}", numbers);
-	// 	});
-	// }
-    
+impl<T: Config> Module<T> {    
 	pub fn derived_key(block_number: T::BlockNumber) -> Vec<u8> {
         block_number.using_encoded(|encoded_bn| {
             ONCHAIN_TX_KEY.clone().into_iter()
@@ -417,47 +325,6 @@ impl<T: Config> Module<T> {
 		// 	return Err(<Error<T>>::NoLocalAcctForSigning);
 		// }
 	}
-    
-	/// Check if we have data before. If yes, we can use the cached version
-	///   stored in off-chain worker storage `storage`. If not, we listen for remote info and
-	///   write the info into the storage for future retrieval.
-	// fn listener() -> Result<(), Error<T>> {
-    //     // ToDo: change key
-	// 	let s_info = StorageValueRef::persistent(b"ocw-demo::gh-info");
-        
-	// 	// Ref: https://substrate.dev/rustdocs/v3.0.0/sp_runtime/offchain/storage/struct.StorageValueRef.html
-	// 	if let Some(Some(data)) = s_info.get::<LightClient>() {
-    //         // data has already been fetched. Return early.
-	// 		debug::info!("cached data: {:?}", data);
-	// 		return Ok(());
-	// 	}
-        
-	// 	// Since off-chain storage can be accessed by off-chain workers from multiple runs, it is important to lock
-	// 	//   it before doing heavy computations or write operations.
-	// 	// ref: https://substrate.dev/rustdocs/v3.0.0-rc3/sp_runtime/offchain/storage_lock/index.html
-		
-	// 	//To-Do change key
-	// 	let mut lock = StorageLock::<BlockAndTime<Self>>::with_block_and_time_deadline(
-    //         b"ocw-demo::lock",
-	// 		LOCK_BLOCK_EXPIRATION,
-	// 		rt_offchain::Duration::from_millis(LOCK_TIMEOUT_EXPIRATION),
-	// 	);
-        
-	// 	// We try to acquire the lock here. If failed, we know the `fetch_n_parse` part inside is being
-	// 	//   executed by previous run of ocw, so the function just returns.
-	// 	// ref: https://substrate.dev/rustdocs/v3.0.0/sp_runtime/offchain/storage_lock/struct.StorageLock.html#method.try_lock
-	// 	if let Ok(_guard) = lock.try_lock() {
-	// 		match Self::fetch_n_parse() {
-	// 			Ok(data) => {
-    //                 s_info.set(&data);
-	// 			}
-	// 			Err(err) => {
-    //                 return Err(err);
-	// 			}
-	// 		}
-	// 	}
-	// 	Ok(())
-	// }
     
 	/// Fetch from remote and deserialize the JSON to a struct
 	fn fetch_n_parse() -> Result<LightClient, Error<T>> {
@@ -675,69 +542,11 @@ impl<T: Config> Module<T> {
 		// Next we fully read the response body and collect it to a vector of bytes.
 		Ok(response.body().collect::<Vec<u8>>())
 	}
-    
-	// fn offchain_signed_tx(block_number: T::BlockNumber) -> Result<(), Error<T>> {
-	// 	//   ref: https://substrate.dev/rustdocs/v3.0.0/frame_system/offchain/struct.Signer.html
-	// 	let signer = Signer::<T, T::AuthorityId>::any_account();
-        
-	// 	let number: u64 = block_number.try_into().unwrap_or(0);
-
-	// 	let result = signer.send_signed_transaction(|_acct|
-	// 		// This is the on-chain function
-	// 		Call::submit_number_signed(number));
-            
-    //         // Display error if the signed tx fails.
-    //         if let Some((acc, res)) = result {
-	// 		if res.is_err() {
-    //             debug::error!("failure: offchain_signed_tx: tx sent: {:?}", acc.id);
-	// 			return Err(<Error<T>>::OffchainSignedTxError);
-	// 		}
-	// 		// Transaction is sent successfully
-	// 		return Ok(());
-	// 	} else {
-    //         // The case result == `None`: no account is available for sending
-	// 		debug::error!("No local account available");
-	// 		return Err(<Error<T>>::NoLocalAcctForSigning);
-	// 	}
-	// }
-    
-	// fn offchain_unsigned_tx(block_number: T::BlockNumber) -> Result<(), Error<T>> {
-    //     let number: u64 = block_number.try_into().unwrap_or(0);
-	// 	let call = Call::submit_number_unsigned(number);
-        
-	// 	// `submit_unsigned_transaction` returns a type of `Result<(), ()>`
-	// 	//   ref: https://substrate.dev/rustdocs/v3.0.0/frame_system/offchain/struct.SubmitTransaction.html#method.submit_unsigned_transaction
-	// 	SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
-    //         debug::error!("Failed in offchain_unsigned_tx");
-	// 		<Error<T>>::OffchainUnsignedTxError
-	// 	})
-	// }
-    
-	// fn offchain_unsigned_tx_signed_payload(block_number: T::BlockNumber) -> Result<(), Error<T>> {
-    //     // Retrieve the signer to sign the payload
-	// 	let signer = Signer::<T, T::AuthorityId>::any_account();
-        
-	// 	let number: u64 = block_number.try_into().unwrap_or(0);
-
-	// 	if let Some((_, res)) = signer.send_unsigned_transaction(
-	// 		|acct| Payload {
-    //             number,
-	// 			public: acct.public.clone(),
-	// 		},
-	// 		Call::submit_number_unsigned_with_signed_payload,
-	// 	) {
-    //         return res.map_err(|_| {
-    //             debug::error!("Failed in offchain_unsigned_tx_signed_payload");
-	// 			<Error<T>>::OffchainUnsignedTxSignedPayloadError
-	// 		});
-	// 	} else {
-    //         // The case of `None`: no account is available for sending
-	// 		debug::error!("No local account available");
-	// 		Err(<Error<T>>::NoLocalAcctForSigning)
-	// 	}: 2631
 }
+
 impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
-		type Call = Call<T>;
+    type Call = Call<T>;
+    
 	fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         let valid_tx = |provide| {
             ValidTransaction::with_tag_prefix("ocw-demo") //TODO: change prefix tag
