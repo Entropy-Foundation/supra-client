@@ -15,5 +15,4 @@
 # direnv cache
 .direnv
 
-Cargo.toml
 Cargo.lock
