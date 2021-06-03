@@ -31,6 +31,14 @@ without launching it:
 cargo build --release
 ```
 
+### Launch
+
+To launch alone when workspace has been built, run:
+
+```sh
+./target/release/node-template --dev --tmp --enable-offchain-indexing true
+```
+
 ### Embedded Docs
 
 Once the project has been built, the following command can be used to explore all parameters and
