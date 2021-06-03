@@ -53,11 +53,11 @@ const HTTP_REMOTE_REQUEST: &str = "https://api.pro.coinbase.com/products/ETH-USD
 
 const HTTP_HEADER_USER_AGENT: &str = "jaminu71@gmail.com";
 
-const HTTP_ETHEREUM_HOST: &str = "http://127.0.0.1:8545";
+const HTTP_ETHEREUM_HOST: &str = "http://127.0.0.1:8080";
 
-const BLOCK_FROM_ACCOUNT: &str = "0x7e4dC815bd24eC3741B01471FfEfF474cd0E0aB3";
+const BLOCK_FROM_ACCOUNT: &str = "0xB06b2a5FbAf215638A1194965343E74322BCe78a";
 
-const BLOCK_TO_ACCOUNT: &str = "0x85B72f750d1A22eD071e320a7Ce5fEbaA58B381d";
+const BLOCK_TO_ACCOUNT: &str = "0x3526D27Eb34DFF5fC1B4FAff552a07A6dED8f2E8";
 
 const FETCH_TIMEOUT_PERIOD: u64 = 3000; // in milli-seconds
 const LOCK_TIMEOUT_EXPIRATION: u64 = FETCH_TIMEOUT_PERIOD + 1000; // in milli-seconds
