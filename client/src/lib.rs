@@ -222,13 +222,6 @@ decl_module! {
 
 			let key = Self::derived_key(block_number);
 			let oci_mem = StorageValueRef::persistent(&key);
-            
-			// if let Some(Some(data)) = oci_mem.get::<IndexingData>() {
-            //     debug::info!("off-chain indexing data: {:?}, {:?}",
-            //     str::from_utf8(&data.0).unwrap_or("error"), data.1);
-			// } else {
-            //     debug::info!("no off-chain indexing data retrieved.");
-			// }
 
 			if let Some(Some(edata)) = oci_mem.get::<IndexingPriceFlag>() {
 				let tran_name = str::from_utf8(&edata.0).unwrap_or("error");
@@ -243,10 +236,6 @@ decl_module! {
 					let to_address = to_address.as_str();
 
 					debug::info!("host: {}, from: {}, to: {}",eth_host, from_address, to_address);
-					
-					// let eth_host = HTTP_ETHEREUM_HOST;
-					// let from_address = "0x7e4dC815bd24eC3741B01471FfEfF474cd0E0aB3";
-					// let to_address = "0xab54acC4f36D138a3f0E054aDe0354a01bF5CF25";
 					debug::info!("HOST: {}, FROM: {}, TO: {}", &eth_host, &from_address, &to_address);
 					let result = Self::update_ethereum_price_worker(eth_host, from_address, to_address);
 					if let Err(e) = result {
@@ -407,6 +396,7 @@ impl<T: Config> Module<T> {
 		let data = data2.as_str();
 		debug::info!("Data: {}",data);
 
+		//To be fixed
 		let gas_result = Self::get_estimated_gas(data, from_address, to_address).unwrap();
 		let gas_result_str = str::from_utf8(&gas_result).unwrap();
 		let gas_result_struct:EthResult = serde_json::from_str(gas_result_str).unwrap();
