@@ -2,15 +2,15 @@
 
 use core::{convert::TryInto, fmt};
 use frame_support::{
-	debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, weights::Weight
+	debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, weights::Weight, pallet_prelude::StorageMap, traits::StorageInstance, StorageHasher 
 };
-use parity_scale_codec::{Encode, Decode};
+use parity_scale_codec::{Encode, Decode, FullCodec};
 
 use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
 		AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
 		SignedPayload, Signer, SigningTypes, SubmitTransaction,
 	}};
-use sp_core::{crypto::KeyTypeId};
+use sp_core::{OpaquePeerId, crypto::KeyTypeId};
 use sp_core::offchain::{Duration, OpaqueMultiaddr, Timestamp};
 use sp_io::offchain_index;
 use sp_runtime::{generic::UncheckedExtrinsic, offchain::http::Request};
@@ -149,11 +149,14 @@ decl_event!(
 		UpdateEthereumPrice(Option<AccountId>),
 		/// Event submit etherium price done.
 		SubmitEthereumPrice(Option<AccountId>, Vec<u8>),
-
-		ConnectionRequested(AccountId),
-        DisconnectRequested(AccountId),
-        FindPeerIssued(AccountId),
-        FindProvidersIssued(AccountId),
+		/// Event emitted by Peer seeking connection to the network
+		ConnectionRequested(Option<AccountId>),
+		/// Event emitted on Peer redundancy
+        DisconnectRequested(Option<AccountId>),
+		/// Event fetching dht of a Peer
+        FindPeerIssued(Option<AccountId>),
+		/// Event fetching peers known to be hosting data needed
+        FindProvidersIssued(Option<AccountId>),
 	}
 );
 
@@ -193,7 +196,9 @@ decl_error! {
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum Call 
+		where 	origin: T::Origin,
+	{
         fn deposit_event() = default;
 
 		// needs to be synchronized with offchain_worker actitivies
@@ -241,35 +246,42 @@ decl_module! {
 			Ok(())
 		}
 
-		/// Mark a `Multiaddr` as a desired connection target. The connection will be established
-        /// during the next run of the off-chain `connection_housekeeping` process.
         #[weight = 100_000]
         pub fn ipfs_connect(origin, addr: Vec<u8>) {
             let who = ensure_signed(origin)?;
             let cmd = ConnectionCommand::ConnectTo(OpaqueMultiaddr(addr));
 
             ConnectionQueue::mutate(|cmds| if !cmds.contains(&cmd) { cmds.push(cmd) });
-            Self::deposit_event(RawEvent::ConnectionRequested(who));
+            Self::deposit_event(RawEvent::ConnectionRequested(Some(who)));
         }
 
-        /// Queues a `Multiaddr` to be disconnected. The connection will be severed during the next
-        /// run of the off-chain `connection_housekeeping` process.
         #[weight = 500_000]
         pub fn ipfs_disconnect(origin, addr: Vec<u8>) {
             let who = ensure_signed(origin)?;
             let cmd = ConnectionCommand::DisconnectFrom(OpaqueMultiaddr(addr));
 
             ConnectionQueue::mutate(|cmds| if !cmds.contains(&cmd) { cmds.push(cmd) });
-            Self::deposit_event(RawEvent::DisconnectRequested(who));
+            Self::deposit_event(RawEvent::DisconnectRequested(Some(who)));
         }
 
         /// Find addresses associated with the given `PeerId`.
         #[weight = 100_000]
-        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) {
+        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) 
+			// -> StorageMap<StorageInstance, StorageHasher, FullCodec, FullCodec> 
+		{
             let who = ensure_signed(origin)?;
 
+			// instantiate data(Key, Value)
+			let data: DataMap;
+
+			//storage instance as Prefix <&'static str>
+
+			//hash the storage instance as Hasher
+			
+
             DhtQueue::mutate(|queue| queue.push(DhtCommand::FindPeer(peer_id)));
-            Self::deposit_event(RawEvent::FindPeerIssued(who));
+            Self::deposit_event(RawEvent::FindPeerIssued(Some(who)));
+			// Ok(())
         }
         
 		fn offchain_worker(block_number: T::BlockNumber) {			
@@ -893,15 +905,32 @@ enum ConnectionCommand {
 
 #[derive(Encode, Decode, PartialEq)]
 enum DataCommand {
-    AddBytes(Vec<u8>),
-    CatBytes(Vec<u8>),
-    InsertPin(Vec<u8>),
-    RemoveBlock(Vec<u8>),
-    RemovePin(Vec<u8>),
+    AddTransaction(Vec<u8>),
+    RemoveTransaction(Vec<u8>),
 }
 
 #[derive(Encode, Decode, PartialEq)]
 enum DhtCommand {
     FindPeer(Vec<u8>),
     // GetProviders(Vec<u8>),
+}
+
+enum IpfsRequest {
+	Connect(OpaqueMultiaddr),
+	Disconnect(OpaqueMultiaddr),
+	FindPeer(OpaquePeerId, Timestamp),
+	AddTransaction,
+	RemoveTransaction,
+}
+
+enum IpfsResponse {
+	Success,
+	Peer(OpaquePeerId),
+	TransactionRemoved(usize) //usize would be the transactionID, 
+}
+
+#[derive(Deserialize, Serialize, Encode, Decode, Default)]
+struct DataMap {
+	key: u8,
+	value: Vec<u8>
 }
