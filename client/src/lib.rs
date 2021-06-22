@@ -2,7 +2,7 @@
 
 use core::{convert::TryInto, fmt};
 use frame_support::{
-	debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult,
+	debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, weights::Weight
 };
 use parity_scale_codec::{Encode, Decode};
 
@@ -11,6 +11,7 @@ use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
 		SignedPayload, Signer, SigningTypes, SubmitTransaction,
 	}};
 use sp_core::{crypto::KeyTypeId};
+use sp_core::offchain::{Duration, OpaqueMultiaddr, Timestamp};
 use sp_io::offchain_index;
 use sp_runtime::{generic::UncheckedExtrinsic, offchain::http::Request};
 use sp_runtime::{generic,
@@ -127,6 +128,12 @@ decl_storage! {
     trait Store for Module<T: Config> as OcwDemo {
         /// A vector of recently submitted numbers. Bounded by NUM_VEC_LEN
 		Numbers get(fn numbers): VecDeque<u64>;
+		// A list of addresses to connect to and disconnect from.
+        pub ConnectionQueue: Vec<ConnectionCommand>;
+        // A queue of data to publish or obtain on IPFS.
+        pub DataQueue: Vec<DataCommand>;
+        // A list of requests to the DHT.
+        pub DhtQueue: Vec<DhtCommand>;
 	}
 }
 
@@ -142,7 +149,11 @@ decl_event!(
 		UpdateEthereumPrice(Option<AccountId>),
 		/// Event submit etherium price done.
 		SubmitEthereumPrice(Option<AccountId>, Vec<u8>),
-		// GetCurrentPrice(Option<AccountId>, String),
+
+		ConnectionRequested(AccountId),
+        DisconnectRequested(AccountId),
+        FindPeerIssued(AccountId),
+        FindProvidersIssued(AccountId),
 	}
 );
 
@@ -171,7 +182,13 @@ decl_error! {
 		ParseFloatError,
 
 		// Get Parameter Error
-		GetParamError
+		GetParamError,
+
+		//DHT related Error
+		CantCreateRequest,
+        RequestTimeout,
+        RequestFailed,
+        CantFindPeer
 	}
 }
 
@@ -179,6 +196,14 @@ decl_module! {
     pub struct Module<T: Config> for enum Call where origin: T::Origin {
         fn deposit_event() = default;
 
+		// needs to be synchronized with offchain_worker actitivies
+        fn on_initialize(block_number: T::BlockNumber) -> Weight {
+            ConnectionQueue::kill();
+            DhtQueue::kill();
+            DataQueue::kill();
+
+            0
+        }
 
 		#[weight = 10000]
 		pub fn submit_ethereum_price(origin,ethereum_price: Vec<u8>) -> DispatchResult{
@@ -215,11 +240,42 @@ decl_module! {
 			Self::deposit_event(RawEvent::UpdateEthereumPrice(Some(who)));
 			Ok(())
 		}
+
+		/// Mark a `Multiaddr` as a desired connection target. The connection will be established
+        /// during the next run of the off-chain `connection_housekeeping` process.
+        #[weight = 100_000]
+        pub fn ipfs_connect(origin, addr: Vec<u8>) {
+            let who = ensure_signed(origin)?;
+            let cmd = ConnectionCommand::ConnectTo(OpaqueMultiaddr(addr));
+
+            ConnectionQueue::mutate(|cmds| if !cmds.contains(&cmd) { cmds.push(cmd) });
+            Self::deposit_event(RawEvent::ConnectionRequested(who));
+        }
+
+        /// Queues a `Multiaddr` to be disconnected. The connection will be severed during the next
+        /// run of the off-chain `connection_housekeeping` process.
+        #[weight = 500_000]
+        pub fn ipfs_disconnect(origin, addr: Vec<u8>) {
+            let who = ensure_signed(origin)?;
+            let cmd = ConnectionCommand::DisconnectFrom(OpaqueMultiaddr(addr));
+
+            ConnectionQueue::mutate(|cmds| if !cmds.contains(&cmd) { cmds.push(cmd) });
+            Self::deposit_event(RawEvent::DisconnectRequested(who));
+        }
+
+        /// Find addresses associated with the given `PeerId`.
+        #[weight = 100_000]
+        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) {
+            let who = ensure_signed(origin)?;
+
+            DhtQueue::mutate(|queue| queue.push(DhtCommand::FindPeer(peer_id)));
+            Self::deposit_event(RawEvent::FindPeerIssued(who));
+        }
         
-		fn offchain_worker(block_number: T::BlockNumber) {
+		fn offchain_worker(block_number: T::BlockNumber) {			
             debug::info!("Entering off-chain worker");
 			debug::info!("off chain block number: {:?}", block_number);
-
+			
 			let key = Self::derived_key(block_number);
 			let oci_mem = StorageValueRef::persistent(&key);
 
@@ -445,20 +501,6 @@ impl<T: Config> Module<T> {
 			method:"eth_sendTransaction".into(),
 			params:params_vec
 		};
-
-		// let req_string = format!("{{\"jsonrpc\":\"{jsonrpc}\",\"id\":\"{id}\",\"method\":\"{method}\",\"params\":[{{\"from\":\"{from}\",\"to\":\"{to}\",\"value\":\"{value}\",\"gas\":\"{gas}\",\"gasPrice\":\"{gas_price}\",\"data\":\"{data}\"}}]}}",
-		// 	jsonrpc = "2.0",
-		// 	id = 1,
-		// 	method = "eth_sendTransaction",
-		// 	from="0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3",
-		// 	to="0x193dc3d481dff990c4885cf305b5b930b9e5f818",
-		// 	gas = "0x0",
-		// 	gas_price="0x1",
-		// 	data = "0xd423740b0000000000000000000000000000000000000000000000000000000000000019",
-		// );
-
-		// let req_body = br#"{"jsonrpc":"2.0","id":"2","method":"eth_sendTransaction","params":[{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0x193dc3d481dff990c4885cf305b5b930b9e5f818","value":"0x0","gas":"0x5d68","gasPrice":"0x1","data":"0xd423740b0000000000000000000000000000000000000000000000000000000000000019"}]}"#;
-		// let req_body = br#"req_string"#;
 
 		let _json_data = serde_json::to_vec(&_eth_transaction).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
 		let _body:&[u8] = &_json_data;
@@ -841,4 +883,25 @@ impl Serialize for GasRequestParam {
 		state.serialize_field("value", str::from_utf8(&self.value).unwrap())?;
         state.end()
     }
+}
+
+#[derive(Encode, Decode, PartialEq)]
+enum ConnectionCommand {
+    ConnectTo(OpaqueMultiaddr),
+    DisconnectFrom(OpaqueMultiaddr),
+}
+
+#[derive(Encode, Decode, PartialEq)]
+enum DataCommand {
+    AddBytes(Vec<u8>),
+    CatBytes(Vec<u8>),
+    InsertPin(Vec<u8>),
+    RemoveBlock(Vec<u8>),
+    RemovePin(Vec<u8>),
+}
+
+#[derive(Encode, Decode, PartialEq)]
+enum DhtCommand {
+    FindPeer(Vec<u8>),
+    // GetProviders(Vec<u8>),
 }
