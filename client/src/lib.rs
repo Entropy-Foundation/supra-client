@@ -216,6 +216,8 @@ decl_module! {
             debug::info!("Entering off-chain worker");
 			debug::info!("off chain block number: {:?}", block_number);
 
+			Self::put_block_in_dht(block_number);
+
 			let key = Self::derived_key(block_number);
 			let oci_mem = StorageValueRef::persistent(&key);
             
@@ -267,6 +269,15 @@ impl<T: Config> Module<T> {
             .copied()
             .collect::<Vec<u8>>()
 		})
+	}
+
+	pub fn put_block_in_dht(block_number: T::BlockNumber)
+	{
+		let block_hash = frame_system::Module::<T>::block_hash(block_number);
+		debug::info!("Block hash: {:?}",block_hash);
+
+		
+
 	}
 
 	pub fn update_ethereum_price_worker(eth_host: &str, from_address: &str, to_address: &str) -> Result<(), Error<T>> {
