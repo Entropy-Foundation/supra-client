@@ -25,6 +25,8 @@ sp-io = { version = '3.0', default-features = false }
 sp-runtime = { version = '3.0', default-features = false }
 sp-std = { version = '3.0', default-features = false }
 sp-keystore = { version = '0.9', optional = true }
+libp2p = "0.38.0"
+sc-network = "0.9.0"
 
 [dependencies.parity-scale-codec]
 default-features = false

@@ -1,10 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use core::{convert::TryInto, fmt};
-use frame_support::{
-	debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, weights::Weight, pallet_prelude::StorageMap, traits::StorageInstance, StorageHasher 
-};
-use parity_scale_codec::{Encode, Decode, FullCodec};
+use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage::{StorageDecodeLength, StorageMap}, weights::Weight};
+use parity_scale_codec::{Encode, Decode, FullCodec, FullEncode, EncodeLike};
 
 use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
 		AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
@@ -157,6 +155,7 @@ decl_event!(
         FindPeerIssued(Option<AccountId>),
 		/// Event fetching peers known to be hosting data needed
         FindProvidersIssued(Option<AccountId>),
+		QueuedTrans(Option<AccountId>),
 	}
 );
 
@@ -266,22 +265,34 @@ decl_module! {
 
         /// Find addresses associated with the given `PeerId`.
         #[weight = 100_000]
-        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) 
-			// -> StorageMap<StorageInstance, StorageHasher, FullCodec, FullCodec> 
-		{
+        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) {
             let who = ensure_signed(origin)?;
-
-			// instantiate data(Key, Value)
-			let data: DataMap;
-
-			//storage instance as Prefix <&'static str>
-
-			//hash the storage instance as Hasher
-			
 
             DhtQueue::mutate(|queue| queue.push(DhtCommand::FindPeer(peer_id)));
             Self::deposit_event(RawEvent::FindPeerIssued(Some(who)));
 			// Ok(())
+        }
+
+        #[weight = 100_000]
+        pub fn ipfs_insert_trans(origin, transaction: Vec<u8>) 
+			// -> StorageMap<StorageInstance, StorageHasher, FullCodec, FullCodec>
+		{
+            let who = ensure_signed(origin)?;
+
+			let id: u8 = 0;
+			
+			// instantiate DataMap(Key, Value) as StorageInstance
+			let data = DataMap {
+				id: id,
+				value: transaction
+			};
+
+			//storage instance as Prefix <&'static str>
+
+			//hash the storage instance as Hasher
+
+            DataQueue::mutate(|queue| queue.push(DataCommand::AddTransaction(data.value)));
+            Self::deposit_event(RawEvent::QueuedTrans(Some(who)));
         }
         
 		fn offchain_worker(block_number: T::BlockNumber) {			
@@ -379,25 +390,6 @@ impl<T: Config> Module<T> {
             debug::error!("Failed in update_ethereum_price_worker");
 			<Error<T>>::OffchainUnsignedTxError
 		})
-		
-		// let result = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(|_acct|
-		// 	// This is the on-chain function
-		// 	Call::submit_ethereum_price(final_price.clone())
-		// );
-			
-		// 	// Display error if the signed tx fails.
-		// if let Some((acc, res)) = result {
-		// 	if res.is_err() {
-		// 		debug::error!("failure: offchain_signed_tx: tx sent: {:?}", acc.id);
-		// 		return Err(<Error<T>>::OffchainSignedTxError);
-		// 	}
-		// 	// Transaction is sent successfully
-		// 	return Ok(());
-		// } else {
-		// 	// The case result == `None`: no account is available for sending
-		// 	debug::error!("No local account available");
-		// 	return Err(<Error<T>>::NoLocalAcctForSigning);
-		// }
 	}
     
 	/// Fetch from remote and deserialize the JSON to a struct
@@ -488,21 +480,6 @@ impl<T: Config> Module<T> {
 			gas_price:"0x1".into(),
 			data:data.into(),
 		};
-
-		// let param_string = r#"{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0","value":"0x0","gas":"0x6800","gasPrice":"0x1","data":"0xd423740b0000000000000000000000000000000000000000000000000000000000000020"}"#;
-
-		// let mut _params:EthParams = serde_json::from_str(param_string).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
-		// _params.data = data.into();
-
-		// debug::info!("_param : {:?}", _params);
-
-		// debug::info!("_param2 : {:?}", _params2);
-
-		// let _param_json= serde_json::to_string(&_params).unwrap();
-		// let _param_json = _param_json.as_str();
-
-		
-		// debug::info!("_param_json : {}", _param_json);
 
 		let mut params_vec = Vec::new();
 		params_vec.push(_params);
@@ -640,6 +617,60 @@ impl<T: Config> rt_offchain::storage_lock::BlockNumberProvider for Module<T> {
 	fn current_block_number() -> Self::BlockNumber {
         <frame_system::Module<T>>::block_number()
 	}
+}
+
+//dht network state can be instantiated here
+impl<T: Config> libp2p::swarm::NetworkBehaviour for Module<T> {
+    fn inject_connection_established(&mut self, _: &libp2p::PeerId, _: &libp2p::core::connection::ConnectionId, _: &libp2p::core::ConnectedPoint)
+    {}
+
+    fn inject_connection_closed(&mut self, _: &libp2p::PeerId, _: &libp2p::core::connection::ConnectionId, _: &libp2p::core::ConnectedPoint)
+    {}
+
+    fn inject_address_change(
+        &mut self,
+        _: &libp2p::PeerId,
+        _: &libp2p::core::connection::ConnectionId,
+        _old: &libp2p::core::ConnectedPoint,
+        _new: &libp2p::core::ConnectedPoint
+    ) {}
+
+    fn inject_addr_reach_failure(&mut self, _peer_id: Option<&libp2p::PeerId>, _addr: &libp2p::Multiaddr, _error: &dyn std::error::Error) {
+    }
+
+    fn inject_dial_failure(&mut self, _peer_id: &libp2p::PeerId) {
+    }
+
+    fn inject_new_listener(&mut self, _id: libp2p::core::connection::ListenerId) {
+    }
+
+    fn inject_new_listen_addr(&mut self, _id: libp2p::core::connection::ListenerId, _addr: &libp2p::Multiaddr) {
+    }
+
+    fn inject_expired_listen_addr(&mut self, _id: libp2p::core::connection::ListenerId, _addr: &libp2p::Multiaddr) {
+    }
+
+    fn inject_listener_error(&mut self, _id: libp2p::core::connection::ListenerId, _err: &(dyn std::error::Error + 'static)) {
+    }
+
+    fn inject_listener_closed(&mut self, _id: libp2p::core::connection::ListenerId, _reason: Result<(), &std::io::Error>) {
+    }
+
+    fn inject_new_external_addr(&mut self, _addr: &libp2p::Multiaddr) {
+    }
+
+    fn inject_expired_external_addr(&mut self, _addr: &libp2p::Multiaddr) {
+    }
+}
+
+impl<T: Config> sc_network::NetworkStateInfo for Module<T> {
+    fn external_addresses(&self) -> Vec<libp2p::Multiaddr> {
+        todo!()
+    }
+
+    fn local_peer_id(&self) -> sc_network::PeerId {
+        todo!()
+    }
 }
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
@@ -931,6 +962,7 @@ enum IpfsResponse {
 
 #[derive(Deserialize, Serialize, Encode, Decode, Default)]
 struct DataMap {
-	key: u8,
+	/// Transaction key
+	id: u8, 
 	value: Vec<u8>
 }
