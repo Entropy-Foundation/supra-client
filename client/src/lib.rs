@@ -32,9 +32,6 @@ use serde::{
 };
 #[macro_use]
 extern crate alloc;
-// use hex_slice::AsHex;
-
-// use sc_client_api::client;
 
 pub type BlockNumber = u32;
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
@@ -120,6 +117,8 @@ pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 	type Call: From<Call<Self>>;
 	/// The overarching event type.
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+	// Transaction Type.
+	// type Transaction: frame_system::Config::Hash;
 }
 
 decl_storage! {
@@ -140,6 +139,7 @@ decl_event!(
 	pub enum Event<T>
 	where
     AccountId = <T as frame_system::Config>::AccountId,
+	TransactionHash = <T as frame_system::Config>::Hash,
 	{
         /// Event generated when a new number is accepted to contribute to the average.
 		NewNumber(Option<AccountId>, u64),
@@ -155,7 +155,8 @@ decl_event!(
         FindPeerIssued(Option<AccountId>),
 		/// Event fetching peers known to be hosting data needed
         FindProvidersIssued(Option<AccountId>),
-		QueuedTrans(Option<AccountId>),
+		// Broadcast to dht api
+		BroadcastTrans(Option<TransactionHash>, AccountId),
 	}
 );
 
@@ -245,7 +246,7 @@ decl_module! {
 			Ok(())
 		}
 
-        #[weight = 100_000]
+        #[weight = 5000]
         pub fn ipfs_connect(origin, addr: Vec<u8>) {
             let who = ensure_signed(origin)?;
             let cmd = ConnectionCommand::ConnectTo(OpaqueMultiaddr(addr));
@@ -254,7 +255,7 @@ decl_module! {
             Self::deposit_event(RawEvent::ConnectionRequested(Some(who)));
         }
 
-        #[weight = 500_000]
+        #[weight = 5000]
         pub fn ipfs_disconnect(origin, addr: Vec<u8>) {
             let who = ensure_signed(origin)?;
             let cmd = ConnectionCommand::DisconnectFrom(OpaqueMultiaddr(addr));
@@ -264,38 +265,25 @@ decl_module! {
         }
 
         /// Find addresses associated with the given `PeerId`.
-        #[weight = 100_000]
-        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) {
+        #[weight = 10000]
+        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             DhtQueue::mutate(|queue| queue.push(DhtCommand::FindPeer(peer_id)));
             Self::deposit_event(RawEvent::FindPeerIssued(Some(who)));
-			// Ok(())
+			Ok(())
         }
 
-        #[weight = 100_000]
-        pub fn ipfs_insert_trans(origin, transaction: Vec<u8>) 
-			// -> StorageMap<StorageInstance, StorageHasher, FullCodec, FullCodec>
-		{
+        #[weight = 10000]
+		//change trans to a runtime transaction event Events or BlockWeights
+        pub fn broadcast_trans_to_dht(origin, trans: T::Hash) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-			let id: u8 = 0;
-			
-			// instantiate DataMap(Key, Value) as StorageInstance
-			let data = DataMap {
-				id: id,
-				value: transaction
-			};
-
-			//storage instance as Prefix <&'static str>
-
-			//hash the storage instance as Hasher
-
-            DataQueue::mutate(|queue| queue.push(DataCommand::AddTransaction(data.value)));
-            Self::deposit_event(RawEvent::QueuedTrans(Some(who)));
+            Self::deposit_event(RawEvent::BroadcastTrans(Some(trans), who));
+			Ok(())
         }
         
-		fn offchain_worker(block_number: T::BlockNumber) {			
+		fn offchain_worker(block_number: T::BlockNumber) {		
             debug::info!("Entering off-chain worker");
 			debug::info!("off chain block number: {:?}", block_number);
 			
@@ -580,7 +568,12 @@ impl<T: Config> Module<T> {
 		// Next we fully read the response body and collect it to a vector of bytes.
 		Ok(response.body().collect::<Vec<u8>>())
 	}
+
+	fn get_hash() {
+
+	}
 }
+
 
 impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     type Call = Call<T>;
@@ -617,60 +610,6 @@ impl<T: Config> rt_offchain::storage_lock::BlockNumberProvider for Module<T> {
 	fn current_block_number() -> Self::BlockNumber {
         <frame_system::Module<T>>::block_number()
 	}
-}
-
-//dht network state can be instantiated here
-impl<T: Config> libp2p::swarm::NetworkBehaviour for Module<T> {
-    fn inject_connection_established(&mut self, _: &libp2p::PeerId, _: &libp2p::core::connection::ConnectionId, _: &libp2p::core::ConnectedPoint)
-    {}
-
-    fn inject_connection_closed(&mut self, _: &libp2p::PeerId, _: &libp2p::core::connection::ConnectionId, _: &libp2p::core::ConnectedPoint)
-    {}
-
-    fn inject_address_change(
-        &mut self,
-        _: &libp2p::PeerId,
-        _: &libp2p::core::connection::ConnectionId,
-        _old: &libp2p::core::ConnectedPoint,
-        _new: &libp2p::core::ConnectedPoint
-    ) {}
-
-    fn inject_addr_reach_failure(&mut self, _peer_id: Option<&libp2p::PeerId>, _addr: &libp2p::Multiaddr, _error: &dyn std::error::Error) {
-    }
-
-    fn inject_dial_failure(&mut self, _peer_id: &libp2p::PeerId) {
-    }
-
-    fn inject_new_listener(&mut self, _id: libp2p::core::connection::ListenerId) {
-    }
-
-    fn inject_new_listen_addr(&mut self, _id: libp2p::core::connection::ListenerId, _addr: &libp2p::Multiaddr) {
-    }
-
-    fn inject_expired_listen_addr(&mut self, _id: libp2p::core::connection::ListenerId, _addr: &libp2p::Multiaddr) {
-    }
-
-    fn inject_listener_error(&mut self, _id: libp2p::core::connection::ListenerId, _err: &(dyn std::error::Error + 'static)) {
-    }
-
-    fn inject_listener_closed(&mut self, _id: libp2p::core::connection::ListenerId, _reason: Result<(), &std::io::Error>) {
-    }
-
-    fn inject_new_external_addr(&mut self, _addr: &libp2p::Multiaddr) {
-    }
-
-    fn inject_expired_external_addr(&mut self, _addr: &libp2p::Multiaddr) {
-    }
-}
-
-impl<T: Config> sc_network::NetworkStateInfo for Module<T> {
-    fn external_addresses(&self) -> Vec<libp2p::Multiaddr> {
-        todo!()
-    }
-
-    fn local_peer_id(&self) -> sc_network::PeerId {
-        todo!()
-    }
 }
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
@@ -960,9 +899,16 @@ enum IpfsResponse {
 	TransactionRemoved(usize) //usize would be the transactionID, 
 }
 
-#[derive(Deserialize, Serialize, Encode, Decode, Default)]
-struct DataMap {
-	/// Transaction key
+// struct DhtResponse {
+// 	data: DataMap,
+// 	/// Receiver's MultiAddr
+// 	receiver: Vec<u8>,
+// }
+
+#[derive(Deserialize, Serialize, Encode, Decode, Default, Clone, Debug)]
+pub struct DataMap<T: Config> {
+	/// Transaction key2
 	id: u8, 
-	value: Vec<u8>
+	/// Transaction value
+	value: T::Hash,
 }
