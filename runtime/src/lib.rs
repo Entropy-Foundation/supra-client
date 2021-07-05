@@ -522,6 +522,12 @@ impl_runtime_apis! {
 		}
 	}
 
+	impl client::BroadcastTransApi<Block> for Runtime {
+		fn broadcast_worker() -> Call {
+			todo()!
+		}
+	}
+
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn dispatch_benchmark(

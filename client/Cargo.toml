@@ -25,6 +25,7 @@ sp-io = { version = '3.0', default-features = false }
 sp-runtime = { version = '3.0', default-features = false }
 sp-std = { version = '3.0', default-features = false }
 sp-keystore = { version = '0.9', optional = true }
+sp-api = { default-features = false, version = '3.0.0' }
 
 [dependencies.parity-scale-codec]
 default-features = false
@@ -40,6 +41,7 @@ std = [
 	'frame-support/std',
 	'frame-system/std',
 	'frame-benchmarking/std',
+	'sp-api/std',
 	'sp-io/std',
 	'sp-runtime/std',
 	'sp-std/std',

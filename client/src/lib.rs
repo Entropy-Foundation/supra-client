@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use core::{convert::TryInto, fmt};
-use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage::{StorageDecodeLength, StorageMap}, weights::Weight};
+use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage::{StorageDecodeLength, StorageMap}, weights::Weight, Hashable};
 use parity_scale_codec::{Encode, Decode, FullCodec, FullEncode, EncodeLike};
 
 use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
@@ -11,6 +11,7 @@ use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
 use sp_core::{OpaquePeerId, crypto::KeyTypeId};
 use sp_core::offchain::{Duration, OpaqueMultiaddr, Timestamp};
 use sp_io::offchain_index;
+use sp_api;
 use sp_runtime::{generic::UncheckedExtrinsic, offchain::http::Request};
 use sp_runtime::{generic,
 	offchain as rt_offchain,
@@ -109,6 +110,12 @@ pub struct EthPayLoad {
 	to_address: Vec<u8>,
 }
 
+sp_api::decl_runtime_apis! {
+	pub trait BroadcastTransApi: Config {
+		fn broadcast_worker() -> Result<Call<dyn Config>, Error<dyn Config>>;
+	}
+}
+
 /// This is the pallet's configuration trait
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// The identifier type for an offchain worker.
@@ -139,7 +146,7 @@ decl_event!(
 	pub enum Event<T>
 	where
     AccountId = <T as frame_system::Config>::AccountId,
-	TransactionHash = <T as frame_system::Config>::Hash,
+	// TransactionHash = <T as frame_system::Config>::Hash,
 	{
         /// Event generated when a new number is accepted to contribute to the average.
 		NewNumber(Option<AccountId>, u64),
@@ -156,7 +163,7 @@ decl_event!(
 		/// Event fetching peers known to be hosting data needed
         FindProvidersIssued(Option<AccountId>),
 		// Broadcast to dht api
-		BroadcastTrans(Option<TransactionHash>, AccountId),
+		BroadcastTrans(Option<Vec<u8>>, AccountId),
 	}
 );
 
@@ -276,7 +283,7 @@ decl_module! {
 
         #[weight = 10000]
 		//change trans to a runtime transaction event Events or BlockWeights
-        pub fn broadcast_trans_to_dht(origin, trans: T::Hash) -> DispatchResult {
+        pub fn broadcast_trans_to_dht(origin, trans: Vec<u8>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             Self::deposit_event(RawEvent::BroadcastTrans(Some(trans), who));
@@ -569,8 +576,19 @@ impl<T: Config> Module<T> {
 		Ok(response.body().collect::<Vec<u8>>())
 	}
 
-	fn get_hash() {
+	fn get_trans_hash<U: Config>() -> U::Hash {
+		todo!()
+	}
 
+	pub fn broadcast_worker() -> Result<Call<T>, Error<T>> {
+		// For example, we use eth price
+		let resp_bytes = Self::fetch_from_remote().map_err(|e| {
+            debug::error!("fetch_from_remote error: {:?}", e);
+			<Error<T>>::HttpFetchingError
+		})?;
+		let test_hash = Hashable::blake2_128_concat(&resp_bytes);
+		let call = Call::broadcast_trans_to_dht(test_hash);
+		Ok(call)
 	}
 }
 
