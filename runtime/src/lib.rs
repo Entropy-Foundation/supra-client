@@ -523,8 +523,8 @@ impl_runtime_apis! {
 	}
 
 	impl client::BroadcastTransApi<Block> for Runtime {
-		fn broadcast_worker() -> Call {
-			todo()!
+		fn broadcast_worker() -> Result<Vec<u8>, ()> {
+			LightClient::broadcast_worker()
 		}
 	}
 

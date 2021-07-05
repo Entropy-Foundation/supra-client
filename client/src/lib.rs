@@ -12,7 +12,6 @@ use sp_core::{OpaquePeerId, crypto::KeyTypeId};
 use sp_core::offchain::{Duration, OpaqueMultiaddr, Timestamp};
 use sp_io::offchain_index;
 use sp_api;
-use sp_runtime::{generic::UncheckedExtrinsic, offchain::http::Request};
 use sp_runtime::{generic,
 	offchain as rt_offchain,
 	offchain::{
@@ -51,10 +50,6 @@ const HTTP_REMOTE_REQUEST: &str = "https://api.pro.coinbase.com/products/ETH-USD
 const HTTP_HEADER_USER_AGENT: &str = "jaminu71@gmail.com";
 
 const HTTP_ETHEREUM_HOST: &str = "http://127.0.0.1:8080";
-
-const BLOCK_FROM_ACCOUNT: &str = "0xB06b2a5FbAf215638A1194965343E74322BCe78a";
-
-const BLOCK_TO_ACCOUNT: &str = "0x3526D27Eb34DFF5fC1B4FAff552a07A6dED8f2E8";
 
 const FETCH_TIMEOUT_PERIOD: u64 = 3000; // in milli-seconds
 const LOCK_TIMEOUT_EXPIRATION: u64 = FETCH_TIMEOUT_PERIOD + 1000; // in milli-seconds
@@ -111,8 +106,8 @@ pub struct EthPayLoad {
 }
 
 sp_api::decl_runtime_apis! {
-	pub trait BroadcastTransApi: Config {
-		fn broadcast_worker() -> Result<Call<dyn Config>, Error<dyn Config>>;
+	pub trait BroadcastTransApi {
+		fn broadcast_worker() -> Result<Vec<u8>, ()>;
 	}
 }
 
@@ -456,17 +451,6 @@ impl<T: Config> Module<T> {
 		let gas_result_str = str::from_utf8(&gas_result).unwrap();
 		let gas_result_struct:EthResult = serde_json::from_str(gas_result_str).unwrap();
 
-
-		// debug::info!("hex_price: {:?}",hex_price);
-
-		// let (_eloop, http) = web3_rs_wasm::transports::Http::new("http://localhost:8545").unwrap();
-		// let web3 = web3_rs_wasm::Web3::new(http);
-		// let accounts = web3.eth().accounts().wait().unwrap();
-
-		// println!("Accounts: {:?}", accounts);
-
-		// let _body = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[],\"id\":1}";
-
 		let _params = EthParams{
 			from:from_address.into(),
 			to:to_address.into(),
@@ -580,15 +564,14 @@ impl<T: Config> Module<T> {
 		todo!()
 	}
 
-	pub fn broadcast_worker() -> Result<Call<T>, Error<T>> {
+	pub fn broadcast_worker() -> Result<Vec<u8>, ()> {
 		// For example, we use eth price
 		let resp_bytes = Self::fetch_from_remote().map_err(|e| {
             debug::error!("fetch_from_remote error: {:?}", e);
 			<Error<T>>::HttpFetchingError
-		})?;
+		}).unwrap();
 		let test_hash = Hashable::blake2_128_concat(&resp_bytes);
-		let call = Call::broadcast_trans_to_dht(test_hash);
-		Ok(call)
+		Ok(test_hash)
 	}
 }
 
