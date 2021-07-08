@@ -1,9 +1,18 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
+use core::{fmt, iter};
+use std::{net::Ipv4Addr};
+use async_std::{task};
+use futures;
+use futures_util;
+use jsonrpc_core::IoHandler;
+use jsonrpc_core::futures::future;
+use libp2p_core;
 use std::sync::Arc;
 use std::time::Duration;
 use sc_client_api::{ExecutorProvider, RemoteBackend};
 use node_template_runtime::{self, opaque::Block, RuntimeApi};
+use parity_multiaddr;
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sp_inherents::InherentDataProviders;
 use sc_executor::native_executor_instance;
@@ -11,6 +20,17 @@ pub use sc_executor::NativeExecutor;
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sc_finality_grandpa::SharedVoterState;
 use sc_keystore::LocalKeystore;
+use sc_network::config::{Params, Role};
+use sc_network::NetworkService;
+// use sc_network::NetworkWorker;
+use libp2p::kad::{Kademlia, KademliaEvent, Quorum, QueryResult,
+    Record,
+	PeerRecord,
+    PutRecordOk,
+	AddProviderOk,
+    record::Key};
+use libp2p::kad::record::store::MemoryStore;
+use libp2p::{identity, PeerId, swarm::NetworkBehaviourEventProcess, Swarm, multiaddr::{Multiaddr, Protocol}, NetworkBehaviour, development_transport};
 
 // Our native executor instance.
 native_executor_instance!(
@@ -343,3 +363,202 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
 
 	Ok(task_manager)
 }
+
+// #[derive(Debug, Clone)]
+// pub struct SupraMultiAddr {
+// 	multiaddr: Vec<MultiaddrWithPeerId>,
+// }
+
+// Dht service
+pub fn new_kademlia_service (mut config: Configuration) -> Result<TaskManager, ServiceError> {
+	//create a peerID
+	let local_key = identity::Keypair::generate_ed25519();
+    let local_peer_id = PeerId::from_public_key(local_key.public());
+
+	// start an instance of a network state
+
+	let sc_service::PartialComponents {
+		client,
+		backend,
+		mut task_manager,
+		import_queue,
+		mut keystore_container,
+		select_chain,
+		transaction_pool,
+		inherent_data_providers,
+		other: (block_import, grandpa_link),
+	} = new_partial(&config)?;
+	
+	let (network, network_status_sinks, system_rpc_tx, network_starter) =
+	sc_service::build_network(sc_service::BuildNetworkParams {
+		config: &config,
+		client: client.clone(),
+		transaction_pool: transaction_pool.clone(),
+		spawn_handle: task_manager.spawn_handle(),
+		import_queue,
+		on_demand: None,
+		block_announce_validator_builder: None,
+	})?;
+
+	// We create a custom RPC Extension builder for quering storage
+	let role = config.role.clone();
+
+	let force_authoring = config.force_authoring;
+	let backoff_authoring_blocks: Option<()> = None;
+	let address = config.network.public_addresses.clone();
+	let enable_grandpa = !config.disable_grandpa;
+	let prometheus_registry = config.prometheus_registry().cloned();
+
+	//typical rpc extension builder boilerplate
+	let rpc_extensions_builder = {
+		let client = client.clone();
+		let pool = transaction_pool.clone();
+
+		Box::new(move |deny_unsafe, _| {
+			let deps = crate::rpc::FullDeps {
+				client: client.clone(),
+				pool: pool.clone(),
+				deny_unsafe,
+			};
+
+			crate::rpc::create_full(deps)
+		})
+	};
+
+	let (rpc_handlers, telemetry_connection_notifier) = sc_service::spawn_tasks(
+		sc_service::SpawnTasksParams {
+			network: network.clone(),
+			client: client.clone(),
+			keystore: keystore_container.sync_keystore(),
+			task_manager: &mut task_manager,
+			transaction_pool: transaction_pool.clone(),
+			rpc_extensions_builder,
+			on_demand: None,
+			remote_blockchain: None,
+			backend,
+			network_status_sinks,
+			system_rpc_tx,
+			config,
+		},
+	)?;
+
+	if role.is_authority() {
+		// let proposer_factory = sc_basic_authorship::ProposerFactory::new(
+		// 	task_manager.spawn_handle(),
+		// 	client.clone(),
+		// 	transaction_pool,
+		// 	prometheus_registry.as_ref(),
+		// );
+
+		
+		//io handling
+		async {
+			// Set up a an encrypted DNS-enabled TCP Transport over the Mplex protocol.
+			let transport = development_transport(local_key).await.unwrap();
+	
+			let store = MemoryStore::new(local_peer_id.clone());
+			let mut kademlia = Kademlia::new(local_peer_id.clone(), store);
+			let behaviour = MyBehaviour { kademlia };
+			// Create a swarm to manage peers and events.
+			let mut swarm = Swarm::new(transport, behaviour, local_peer_id);
+	
+			swarm.behaviour_mut().kademlia;
+			
+			
+			// the AURA authoring task is considered essential, i.e. if it
+			// fails we take down the service with it.
+			task_manager.spawn_essential_handle();
+
+			let mut io = IoHandler::new();
+			let request_handler= io.handle_request("PUT");
+			// test, would be replaced with an rpc call: using the rpc_extension_builder above.
+			let key = Key::new(b"new");
+			let value = vec![2];
+	
+			let record = Record {
+				key,
+				value,
+				publisher: None,
+				expires: None,
+			};
+	
+			let task_put_block = kademlia.put_record(record, Quorum::One);
+		};
+
+	}
+	
+	// node made read to listen to requests
+	config.network.listen_addresses = vec![
+		iter::once(Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)))
+		.chain(iter::once(Protocol::Tcp(0)))
+		.collect()
+		];
+
+	// db instance
+		
+	network_starter.start_network();
+	
+	Ok(task_manager)
+}
+
+
+
+#[derive(NetworkBehaviour)]
+struct MyBehaviour {
+    kademlia: Kademlia<MemoryStore>,
+    // mdns: Mdns
+}
+
+impl NetworkBehaviourEventProcess<KademliaEvent> for MyBehaviour {
+    // Called when `kademlia` produces an event.
+    fn inject_event(&mut self, message: KademliaEvent) {
+        match message {
+            KademliaEvent::QueryResult { result, .. } => match result {
+                QueryResult::GetProviders(Ok(ok)) => {
+                    for peer in ok.providers {
+                        println!(
+                            "Peer {:?} provides key {:?}",
+                            peer,
+                            std::str::from_utf8(ok.key.as_ref()).unwrap()
+                        );
+                    }
+                }
+                QueryResult::GetProviders(Err(err)) => {
+                    eprintln!("Failed to get providers: {:?}", err);
+                }
+                QueryResult::GetRecord(Ok(ok)) => {
+                    for PeerRecord { record: Record { key, value, .. }, ..} in ok.records {
+                        println!(
+                            "Got record {:?} {:?}",
+                            std::str::from_utf8(key.as_ref()).unwrap(),
+                            std::str::from_utf8(&value).unwrap(),
+                        );
+                    }
+                }
+                QueryResult::GetRecord(Err(err)) => {
+                    eprintln!("Failed to get record: {:?}", err);
+                }
+                QueryResult::PutRecord(Ok(PutRecordOk { key })) => {
+                    println!(
+                        "Successfully put record {:?}",
+                        std::str::from_utf8(key.as_ref()).unwrap()
+                    );
+                }
+                QueryResult::PutRecord(Err(err)) => {
+                    eprintln!("Failed to put record: {:?}", err);
+                }
+                QueryResult::StartProviding(Ok(AddProviderOk { key })) => {
+                    println!("Successfully put provider record {:?}",
+                        std::str::from_utf8(key.as_ref()).unwrap()
+                    );
+                }
+                QueryResult::StartProviding(Err(err)) => {
+                    eprintln!("Failed to put provider record: {:?}", err);
+                }
+                _ => {}
+            }
+            _ => {}
+        }
+    }
+}
+
