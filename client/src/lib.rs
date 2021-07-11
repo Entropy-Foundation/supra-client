@@ -1,15 +1,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use core::{convert::TryInto, fmt};
+use core::fmt;
 use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage::{StorageDecodeLength, StorageMap}, weights::Weight, Hashable};
-use parity_scale_codec::{Encode, Decode, FullCodec, FullEncode, EncodeLike};
+use parity_scale_codec::{Encode, Decode};
 
 use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
-		AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
+		AppCrypto, CreateSignedTransaction,
 		SignedPayload, Signer, SigningTypes, SubmitTransaction,
 	}};
-use sp_core::{OpaquePeerId, crypto::KeyTypeId};
-use sp_core::offchain::{Duration, OpaqueMultiaddr, Timestamp};
+use sp_core::{crypto::KeyTypeId};
+use sp_core::offchain::OpaqueMultiaddr;
 use sp_io::offchain_index;
 use sp_api;
 use sp_runtime::{generic,
@@ -105,12 +105,6 @@ pub struct EthPayLoad {
 	to_address: Vec<u8>,
 }
 
-sp_api::decl_runtime_apis! {
-	pub trait BroadcastTransApi {
-		fn broadcast_worker() -> Result<Vec<u8>, ()>;
-	}
-}
-
 /// This is the pallet's configuration trait
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// The identifier type for an offchain worker.
@@ -119,20 +113,12 @@ pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
 	type Call: From<Call<Self>>;
 	/// The overarching event type.
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
-	// Transaction Type.
-	// type Transaction: frame_system::Config::Hash;
 }
 
 decl_storage! {
     trait Store for Module<T: Config> as OcwDemo {
         /// A vector of recently submitted numbers. Bounded by NUM_VEC_LEN
 		Numbers get(fn numbers): VecDeque<u64>;
-		// A list of addresses to connect to and disconnect from.
-        pub ConnectionQueue: Vec<ConnectionCommand>;
-        // A queue of data to publish or obtain on IPFS.
-        pub DataQueue: Vec<DataCommand>;
-        // A list of requests to the DHT.
-        pub DhtQueue: Vec<DhtCommand>;
 	}
 }
 
@@ -149,16 +135,6 @@ decl_event!(
 		UpdateEthereumPrice(Option<AccountId>),
 		/// Event submit etherium price done.
 		SubmitEthereumPrice(Option<AccountId>, Vec<u8>),
-		/// Event emitted by Peer seeking connection to the network
-		ConnectionRequested(Option<AccountId>),
-		/// Event emitted on Peer redundancy
-        DisconnectRequested(Option<AccountId>),
-		/// Event fetching dht of a Peer
-        FindPeerIssued(Option<AccountId>),
-		/// Event fetching peers known to be hosting data needed
-        FindProvidersIssued(Option<AccountId>),
-		// Broadcast to dht api
-		BroadcastTrans(Option<Vec<u8>>, AccountId),
 	}
 );
 
@@ -188,12 +164,6 @@ decl_error! {
 
 		// Get Parameter Error
 		GetParamError,
-
-		//DHT related Error
-		CantCreateRequest,
-        RequestTimeout,
-        RequestFailed,
-        CantFindPeer
 	}
 }
 
@@ -202,15 +172,6 @@ decl_module! {
 		where 	origin: T::Origin,
 	{
         fn deposit_event() = default;
-
-		// needs to be synchronized with offchain_worker actitivies
-        fn on_initialize(block_number: T::BlockNumber) -> Weight {
-            ConnectionQueue::kill();
-            DhtQueue::kill();
-            DataQueue::kill();
-
-            0
-        }
 
 		#[weight = 10000]
 		pub fn submit_ethereum_price(origin,ethereum_price: Vec<u8>) -> DispatchResult{
@@ -247,43 +208,6 @@ decl_module! {
 			Self::deposit_event(RawEvent::UpdateEthereumPrice(Some(who)));
 			Ok(())
 		}
-
-        #[weight = 5000]
-        pub fn ipfs_connect(origin, addr: Vec<u8>) {
-            let who = ensure_signed(origin)?;
-            let cmd = ConnectionCommand::ConnectTo(OpaqueMultiaddr(addr));
-
-            ConnectionQueue::mutate(|cmds| if !cmds.contains(&cmd) { cmds.push(cmd) });
-            Self::deposit_event(RawEvent::ConnectionRequested(Some(who)));
-        }
-
-        #[weight = 5000]
-        pub fn ipfs_disconnect(origin, addr: Vec<u8>) {
-            let who = ensure_signed(origin)?;
-            let cmd = ConnectionCommand::DisconnectFrom(OpaqueMultiaddr(addr));
-
-            ConnectionQueue::mutate(|cmds| if !cmds.contains(&cmd) { cmds.push(cmd) });
-            Self::deposit_event(RawEvent::DisconnectRequested(Some(who)));
-        }
-
-        /// Find addresses associated with the given `PeerId`.
-        #[weight = 10000]
-        pub fn ipfs_dht_find_peer(origin, peer_id: Vec<u8>) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            DhtQueue::mutate(|queue| queue.push(DhtCommand::FindPeer(peer_id)));
-            Self::deposit_event(RawEvent::FindPeerIssued(Some(who)));
-			Ok(())
-        }
-
-        #[weight = 10000]
-		//change trans to a runtime transaction event Events or BlockWeights
-        pub fn broadcast_trans_to_dht(origin, trans: Vec<u8>) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            Self::deposit_event(RawEvent::BroadcastTrans(Some(trans), who));
-			Ok(())
-        }
         
 		fn offchain_worker(block_number: T::BlockNumber) {		
             debug::info!("Entering off-chain worker");
@@ -558,20 +482,6 @@ impl<T: Config> Module<T> {
         
 		// Next we fully read the response body and collect it to a vector of bytes.
 		Ok(response.body().collect::<Vec<u8>>())
-	}
-
-	fn get_trans_hash<U: Config>() -> U::Hash {
-		todo!()
-	}
-
-	pub fn broadcast_worker() -> Result<Vec<u8>, ()> {
-		// For example, we use eth price
-		let resp_bytes = Self::fetch_from_remote().map_err(|e| {
-            debug::error!("fetch_from_remote error: {:?}", e);
-			<Error<T>>::HttpFetchingError
-		}).unwrap();
-		let test_hash = Hashable::blake2_128_concat(&resp_bytes);
-		Ok(test_hash)
 	}
 }
 
@@ -866,50 +776,4 @@ impl Serialize for GasRequestParam {
 		state.serialize_field("value", str::from_utf8(&self.value).unwrap())?;
         state.end()
     }
-}
-
-#[derive(Encode, Decode, PartialEq)]
-enum ConnectionCommand {
-    ConnectTo(OpaqueMultiaddr),
-    DisconnectFrom(OpaqueMultiaddr),
-}
-
-#[derive(Encode, Decode, PartialEq)]
-enum DataCommand {
-    AddTransaction(Vec<u8>),
-    RemoveTransaction(Vec<u8>),
-}
-
-#[derive(Encode, Decode, PartialEq)]
-enum DhtCommand {
-    FindPeer(Vec<u8>),
-    // GetProviders(Vec<u8>),
-}
-
-enum IpfsRequest {
-	Connect(OpaqueMultiaddr),
-	Disconnect(OpaqueMultiaddr),
-	FindPeer(OpaquePeerId, Timestamp),
-	AddTransaction,
-	RemoveTransaction,
-}
-
-enum IpfsResponse {
-	Success,
-	Peer(OpaquePeerId),
-	TransactionRemoved(usize) //usize would be the transactionID, 
-}
-
-// struct DhtResponse {
-// 	data: DataMap,
-// 	/// Receiver's MultiAddr
-// 	receiver: Vec<u8>,
-// }
-
-#[derive(Deserialize, Serialize, Encode, Decode, Default, Clone, Debug)]
-pub struct DataMap<T: Config> {
-	/// Transaction key2
-	id: u8, 
-	/// Transaction value
-	value: T::Hash,
 }

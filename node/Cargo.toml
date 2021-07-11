@@ -24,11 +24,12 @@ futures = "0.3.15"
 futures-util = "0.3.15"
 jsonrpc-core = '15.1.0'
 structopt = '0.3.8'
+serde = "1.0.126"
 
 # Libp2p dependencies
 libp2p-core = "0.28.3"
-libp2p = "0.38.0"
-libp2p-kad = "0.30.0"
+libp2p = "0.34.0"
+libp2p-kad = "0.28.1"
 
 # Substrate dependencies
 frame-benchmarking = '3.1.0'
