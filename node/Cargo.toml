@@ -19,13 +19,23 @@ targets = ['x86_64-unknown-linux-gnu']
 substrate-build-script-utils = '3.0.0'
 
 [dependencies]
+async-std = { version = "1.9.0", features = ["attributes"] }
+futures = "0.3.15"
+futures-util = "0.3.15"
 jsonrpc-core = '15.1.0'
 structopt = '0.3.8'
+serde = "1.0.126"
+
+# Libp2p dependencies
+libp2p-core = "0.28.3"
+libp2p = "0.34.0"
+libp2p-kad = "0.28.1"
 
 # Substrate dependencies
 frame-benchmarking = '3.1.0'
 frame-benchmarking-cli = '3.0.0'
 pallet-transaction-payment-rpc = '3.0.0'
+parity-multiaddr = "0.11.2"
 sc-basic-authorship = '0.9.0'
 sc-cli = { features = ['wasmtime'], version = '0.9.0' }
 sc-client-api = '3.0.0'
@@ -34,6 +44,7 @@ sc-consensus-aura = '0.9.0'
 sc-executor = { features = ['wasmtime'], version = '0.9.0' }
 sc-finality-grandpa = '0.9.0'
 sc-keystore = '3.0.0'
+sc-network = "0.9.0"
 sc-rpc = '3.0.0'
 sc-rpc-api = '0.9.0'
 sc-service = { features = ['wasmtime'], version = '0.9.0' }
