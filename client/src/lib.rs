@@ -1,18 +1,17 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use core::{convert::TryInto, fmt};
-use frame_support::{
-	debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult,
-};
+use core::fmt;
+use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage::{StorageDecodeLength, StorageMap}, weights::Weight, Hashable};
 use parity_scale_codec::{Encode, Decode};
 
 use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
-		AppCrypto, CreateSignedTransaction, SendSignedTransaction, SendUnsignedTransaction,
+		AppCrypto, CreateSignedTransaction,
 		SignedPayload, Signer, SigningTypes, SubmitTransaction,
 	}};
 use sp_core::{crypto::KeyTypeId};
+use sp_core::offchain::OpaqueMultiaddr;
 use sp_io::offchain_index;
-use sp_runtime::{generic::UncheckedExtrinsic, offchain::http::Request};
+use sp_api;
 use sp_runtime::{generic,
 	offchain as rt_offchain,
 	offchain::{
@@ -33,9 +32,6 @@ use serde::{
 };
 #[macro_use]
 extern crate alloc;
-// use hex_slice::AsHex;
-
-// use sc_client_api::client;
 
 pub type BlockNumber = u32;
 pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
@@ -54,10 +50,6 @@ const HTTP_REMOTE_REQUEST: &str = "https://api.pro.coinbase.com/products/ETH-USD
 const HTTP_HEADER_USER_AGENT: &str = "jaminu71@gmail.com";
 
 const HTTP_ETHEREUM_HOST: &str = "http://127.0.0.1:8080";
-
-const BLOCK_FROM_ACCOUNT: &str = "0xB06b2a5FbAf215638A1194965343E74322BCe78a";
-
-const BLOCK_TO_ACCOUNT: &str = "0x3526D27Eb34DFF5fC1B4FAff552a07A6dED8f2E8";
 
 const FETCH_TIMEOUT_PERIOD: u64 = 3000; // in milli-seconds
 const LOCK_TIMEOUT_EXPIRATION: u64 = FETCH_TIMEOUT_PERIOD + 1000; // in milli-seconds
@@ -135,6 +127,7 @@ decl_event!(
 	pub enum Event<T>
 	where
     AccountId = <T as frame_system::Config>::AccountId,
+	// TransactionHash = <T as frame_system::Config>::Hash,
 	{
         /// Event generated when a new number is accepted to contribute to the average.
 		NewNumber(Option<AccountId>, u64),
@@ -142,7 +135,6 @@ decl_event!(
 		UpdateEthereumPrice(Option<AccountId>),
 		/// Event submit etherium price done.
 		SubmitEthereumPrice(Option<AccountId>, Vec<u8>),
-		// GetCurrentPrice(Option<AccountId>, String),
 	}
 );
 
@@ -171,14 +163,15 @@ decl_error! {
 		ParseFloatError,
 
 		// Get Parameter Error
-		GetParamError
+		GetParamError,
 	}
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum Call where origin: T::Origin {
+    pub struct Module<T: Config> for enum Call 
+		where 	origin: T::Origin,
+	{
         fn deposit_event() = default;
-
 
 		#[weight = 10000]
 		pub fn submit_ethereum_price(origin,ethereum_price: Vec<u8>) -> DispatchResult{
@@ -216,10 +209,10 @@ decl_module! {
 			Ok(())
 		}
         
-		fn offchain_worker(block_number: T::BlockNumber) {
+		fn offchain_worker(block_number: T::BlockNumber) {		
             debug::info!("Entering off-chain worker");
 			debug::info!("off chain block number: {:?}", block_number);
-
+			
 			let key = Self::derived_key(block_number);
 			let oci_mem = StorageValueRef::persistent(&key);
 
@@ -311,25 +304,6 @@ impl<T: Config> Module<T> {
             debug::error!("Failed in update_ethereum_price_worker");
 			<Error<T>>::OffchainUnsignedTxError
 		})
-		
-		// let result = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(|_acct|
-		// 	// This is the on-chain function
-		// 	Call::submit_ethereum_price(final_price.clone())
-		// );
-			
-		// 	// Display error if the signed tx fails.
-		// if let Some((acc, res)) = result {
-		// 	if res.is_err() {
-		// 		debug::error!("failure: offchain_signed_tx: tx sent: {:?}", acc.id);
-		// 		return Err(<Error<T>>::OffchainSignedTxError);
-		// 	}
-		// 	// Transaction is sent successfully
-		// 	return Ok(());
-		// } else {
-		// 	// The case result == `None`: no account is available for sending
-		// 	debug::error!("No local account available");
-		// 	return Err(<Error<T>>::NoLocalAcctForSigning);
-		// }
 	}
     
 	/// Fetch from remote and deserialize the JSON to a struct
@@ -401,17 +375,6 @@ impl<T: Config> Module<T> {
 		let gas_result_str = str::from_utf8(&gas_result).unwrap();
 		let gas_result_struct:EthResult = serde_json::from_str(gas_result_str).unwrap();
 
-
-		// debug::info!("hex_price: {:?}",hex_price);
-
-		// let (_eloop, http) = web3_rs_wasm::transports::Http::new("http://localhost:8545").unwrap();
-		// let web3 = web3_rs_wasm::Web3::new(http);
-		// let accounts = web3.eth().accounts().wait().unwrap();
-
-		// println!("Accounts: {:?}", accounts);
-
-		// let _body = "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[],\"id\":1}";
-
 		let _params = EthParams{
 			from:from_address.into(),
 			to:to_address.into(),
@@ -420,21 +383,6 @@ impl<T: Config> Module<T> {
 			gas_price:"0x1".into(),
 			data:data.into(),
 		};
-
-		// let param_string = r#"{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0xDDb1C71FF6756F4e3f6af22e9b35BEBbebF391A0","value":"0x0","gas":"0x6800","gasPrice":"0x1","data":"0xd423740b0000000000000000000000000000000000000000000000000000000000000020"}"#;
-
-		// let mut _params:EthParams = serde_json::from_str(param_string).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
-		// _params.data = data.into();
-
-		// debug::info!("_param : {:?}", _params);
-
-		// debug::info!("_param2 : {:?}", _params2);
-
-		// let _param_json= serde_json::to_string(&_params).unwrap();
-		// let _param_json = _param_json.as_str();
-
-		
-		// debug::info!("_param_json : {}", _param_json);
 
 		let mut params_vec = Vec::new();
 		params_vec.push(_params);
@@ -445,20 +393,6 @@ impl<T: Config> Module<T> {
 			method:"eth_sendTransaction".into(),
 			params:params_vec
 		};
-
-		// let req_string = format!("{{\"jsonrpc\":\"{jsonrpc}\",\"id\":\"{id}\",\"method\":\"{method}\",\"params\":[{{\"from\":\"{from}\",\"to\":\"{to}\",\"value\":\"{value}\",\"gas\":\"{gas}\",\"gasPrice\":\"{gas_price}\",\"data\":\"{data}\"}}]}}",
-		// 	jsonrpc = "2.0",
-		// 	id = 1,
-		// 	method = "eth_sendTransaction",
-		// 	from="0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3",
-		// 	to="0x193dc3d481dff990c4885cf305b5b930b9e5f818",
-		// 	gas = "0x0",
-		// 	gas_price="0x1",
-		// 	data = "0xd423740b0000000000000000000000000000000000000000000000000000000000000019",
-		// );
-
-		// let req_body = br#"{"jsonrpc":"2.0","id":"2","method":"eth_sendTransaction","params":[{"from":"0x7e4dc815bd24ec3741b01471ffeff474cd0e0ab3","to":"0x193dc3d481dff990c4885cf305b5b930b9e5f818","value":"0x0","gas":"0x5d68","gasPrice":"0x1","data":"0xd423740b0000000000000000000000000000000000000000000000000000000000000019"}]}"#;
-		// let req_body = br#"req_string"#;
 
 		let _json_data = serde_json::to_vec(&_eth_transaction).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
 		let _body:&[u8] = &_json_data;
@@ -550,6 +484,7 @@ impl<T: Config> Module<T> {
 		Ok(response.body().collect::<Vec<u8>>())
 	}
 }
+
 
 impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     type Call = Call<T>;

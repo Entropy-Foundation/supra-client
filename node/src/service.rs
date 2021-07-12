@@ -1,16 +1,26 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
+use std::{net::Ipv4Addr};
+use libp2p_kad::record::Key;
+use node_template_runtime::debug::info;
 use std::sync::Arc;
 use std::time::Duration;
-use sc_client_api::{ExecutorProvider, RemoteBackend};
+use sc_client_api::{ExecutorProvider, RemoteBackend, blockchain::HeaderBackend, BlockchainEvents};
 use node_template_runtime::{self, opaque::Block, RuntimeApi};
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sp_inherents::InherentDataProviders;
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
+use sp_blockchain::Info;
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sc_finality_grandpa::SharedVoterState;
 use sc_keystore::LocalKeystore;
+use sc_network::config::{self, MultiaddrWithPeerId, Params, TransactionPool};
+use sc_network::{NetworkService, NetworkWorker};
+use serde::{
+	Deserialize, Deserializer, Serialize
+};
+use libp2p::{identity, PeerId, swarm::NetworkBehaviourEventProcess, Swarm, multiaddr::{Multiaddr, Protocol}, NetworkBehaviour};
 
 // Our native executor instance.
 native_executor_instance!(
@@ -99,6 +109,14 @@ fn remote_keystore(_url: &String) -> Result<Arc<LocalKeystore>, &'static str> {
 	Err("Remote Keystore not supported.")
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct DataMap {
+	// Transaction key2
+	key: Key, 
+	// Transaction value
+	value: Vec<u8>,
+}
+
 /// Builds a new service for a full client.
 pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
@@ -141,6 +159,40 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 			&config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
 		);
 	}
+	
+	// Current best block at initialization, to report to the RPC layer.
+	let last_hash = client.info().finalized_hash;
+	let block_collected = format!("{}", last_hash.clone());
+	info!("Current block saved to peer DHT {:?}", block_collected);
+
+	//define batch key as_bytes
+	let current_block_number: u32 = client.info().finalized_number;
+	
+	//todo! make batch increment after every 100 count
+	let mut batch_number = 0;
+	if current_block_number == 100 {
+		batch_number += 1;
+	}
+
+	let parsed_block_number = format!("{}", batch_number.clone());
+
+	info!("DHT record key {:?}", &parsed_block_number);
+	let key = Key::from(parsed_block_number.as_bytes().to_vec());
+
+	let data = DataMap {
+		key: key,
+		value: block_collected.as_bytes().to_vec()
+	};
+
+	// parse data into dht 
+	network.put_value(data.key.clone(), data.value);
+
+	// get value from dht
+	network.get_value(&data.key.clone());
+
+	//event
+
+	//request
 
 	let role = config.role.clone();
 	let force_authoring = config.force_authoring;
@@ -343,3 +395,4 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
 
 	Ok(task_manager)
 }
+
