@@ -141,20 +141,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 		};
 	}
 
-	//dht
-	let local_key = identity::Keypair::generate_ed25519();
-    let local_peer_id = PeerId::from_public_key(local_key.public().clone());
-
-	//address
-    let localhost = Ipv4Addr::new(0, 0, 0, 0);
-    let test_tcp: &str = "8080";
-    let targetted_tcp = Protocol::Ip4(localhost);
-    
-    let address = format!("{}/tcp/{}/p2p/{}", targetted_tcp, test_tcp, local_peer_id.clone());
-    let multi_addr= address.as_str();
-
-	let (peer_id, multiaddr) = config::parse_str_addr(multi_addr).unwrap();
-
 	config.network.extra_sets.push(sc_finality_grandpa::grandpa_peers_set_config());
 
 	let (network, network_status_sinks, system_rpc_tx, network_starter) =
