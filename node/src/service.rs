@@ -1,26 +1,24 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::{net::Ipv4Addr};
+use std::{path::PathBuf, fs};
 use libp2p_kad::record::Key;
 use node_template_runtime::debug::info;
+use sp_consensus::InherentData;
 use std::sync::Arc;
 use std::time::Duration;
-use sc_client_api::{ExecutorProvider, RemoteBackend, blockchain::HeaderBackend, BlockchainEvents};
+use sc_client_api::{ExecutorProvider, RemoteBackend, blockchain::HeaderBackend};
 use node_template_runtime::{self, opaque::Block, RuntimeApi};
-use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
-use sp_inherents::InherentDataProviders;
+use sc_service::{Configuration, PartialComponents, TaskManager, error::Error as ServiceError};
+use sp_inherents::{InherentDataProviders, ProvideInherentData};
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
-use sp_blockchain::Info;
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sc_finality_grandpa::SharedVoterState;
 use sc_keystore::LocalKeystore;
-use sc_network::config::{self, MultiaddrWithPeerId, Params, TransactionPool};
-use sc_network::{NetworkService, NetworkWorker};
-use serde::{
-	Deserialize, Deserializer, Serialize
-};
-use libp2p::{identity, PeerId, swarm::NetworkBehaviourEventProcess, Swarm, multiaddr::{Multiaddr, Protocol}, NetworkBehaviour};
+
+use std::{iter, net::Ipv4Addr};
+use libp2p::core::multiaddr::Protocol;
+
 
 // Our native executor instance.
 native_executor_instance!(
@@ -33,6 +31,43 @@ native_executor_instance!(
 type FullClient = sc_service::TFullClient<Block, RuntimeApi, Executor>;
 type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
+
+// TO DO inherent data provider
+pub const INHERENT_IDENTIFIER: sp_inherents::InherentIdentifier = *b"dhtdataM";
+
+impl ProvideInherentData for DataMap {
+    fn on_register(&self, _: &InherentDataProviders) -> Result<(), sp_inherents::Error> {
+		Ok(())
+	}
+
+    fn inherent_identifier(&self) -> &'static sp_inherents::InherentIdentifier {
+		// let key = format!("{:?}", self.key);
+		//Todo: convert keys above to bytes array. 
+		&INHERENT_IDENTIFIER
+    }
+
+    fn provide_inherent_data(&self, inherent_data: &mut sp_consensus::InherentData) -> Result<(), sp_inherents::Error> {
+        // dht value: block
+		// let mut data = InherentData::new();
+		inherent_data.put_data(INHERENT_IDENTIFIER, &self.value)
+		// todo!()
+    }
+
+    fn error_to_string(&self, error: &[u8]) -> Option<String> {
+        todo!()
+    }
+}
+
+pub fn build_inherent_data_providers() -> Result<InherentDataProviders, ServiceError> {
+	let providers = InherentDataProviders::new();
+
+	providers
+		.register_provider(DataMap::new())
+		.map_err(Into::into)
+		.map_err(sp_consensus::error::Error::InherentData)?;
+
+	Ok(providers)
+}
 
 pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponents<
 	FullClient, FullBackend, FullSelectChain,
@@ -52,7 +87,7 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
 		return Err(ServiceError::Other(
 			format!("Remote Keystores are not supported.")))
 	}
-	let inherent_data_providers = InherentDataProviders::new();
+	let inherent_data_providers =  build_inherent_data_providers()?;
 
 	let (client, backend, keystore_container, task_manager) =
 		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
@@ -109,12 +144,31 @@ fn remote_keystore(_url: &String) -> Result<Arc<LocalKeystore>, &'static str> {
 	Err("Remote Keystore not supported.")
 }
 
+/// Supra data structure to be saved in the DHT. 
 #[derive(Debug, Eq, PartialEq)]
-pub struct DataMap {
-	// Transaction key2
+struct DataMap {
+	/// The (opaque) key of a record. 
+	/// It is derived from the blockchain info's(Info<Block>) finalized_number 
 	key: Key, 
-	// Transaction value
+	/// Our value is the best(latest) block hashed parsed to bytes
 	value: Vec<u8>,
+}
+
+impl DataMap {
+	pub fn new() -> Self {
+		// let info = 
+		let key = Key::new(b"dhtdataM");
+		Self {
+			key,
+			value: Default::default()
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+struct DhtLocalStorage {
+	path: PathBuf,
+	// password: String
 }
 
 /// Builds a new service for a full client.
@@ -159,40 +213,42 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 			&config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
 		);
 	}
+
+	config.network.enable_dht_random_walk = true;
 	
 	// Current best block at initialization, to report to the RPC layer.
-	let last_hash = client.info().finalized_hash;
+	let last_hash = client.info().best_hash;
 	let block_collected = format!("{}", last_hash.clone());
 	info!("Current block saved to peer DHT {:?}", block_collected);
-
+	
 	//define batch key as_bytes
 	let current_block_number: u32 = client.info().finalized_number;
 	
-	//todo! make batch increment after every 100 count
-	let mut batch_number = 0;
-	if current_block_number == 100 {
-		batch_number += 1;
-	}
-
-	let parsed_block_number = format!("{}", batch_number.clone());
-
+	let parsed_block_number = format!("{}", current_block_number.clone());
+	
 	info!("DHT record key {:?}", &parsed_block_number);
 	let key = Key::from(parsed_block_number.as_bytes().to_vec());
-
+	
 	let data = DataMap {
-		key: key,
+		key,
 		value: block_collected.as_bytes().to_vec()
 	};
-
+	
 	// parse data into dht 
 	network.put_value(data.key.clone(), data.value);
-
-	// get value from dht
+	
 	network.get_value(&data.key.clone());
-
-	//event
-
+	
+	//event 50663.
+	
 	//request
+	
+	
+	config.network.listen_addresses = vec![
+        iter::once(Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)))
+        .chain(iter::once(Protocol::Tcp(0)))
+        .collect()
+        ];
 
 	let role = config.role.clone();
 	let force_authoring = config.force_authoring;
