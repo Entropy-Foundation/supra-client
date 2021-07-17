@@ -4,12 +4,11 @@ use core::fmt;
 use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage::{StorageDecodeLength, StorageMap}, weights::Weight, Hashable};
 use parity_scale_codec::{Encode, Decode};
 
-use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
+use frame_system::{ensure_none, ensure_signed, offchain::{
 		AppCrypto, CreateSignedTransaction,
-		SignedPayload, Signer, SigningTypes, SubmitTransaction,
+		SignedPayload, SigningTypes, SubmitTransaction,
 	}};
 use sp_core::{crypto::KeyTypeId};
-use sp_core::offchain::OpaqueMultiaddr;
 use sp_io::offchain_index;
 use sp_api;
 use sp_runtime::{generic,

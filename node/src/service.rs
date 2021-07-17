@@ -1,24 +1,21 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::{path::PathBuf, fs};
 use libp2p_kad::record::Key;
 use node_template_runtime::debug::info;
-use sp_consensus::InherentData;
-use std::sync::Arc;
-use std::time::Duration;
-use sc_client_api::{ExecutorProvider, RemoteBackend, blockchain::HeaderBackend};
 use node_template_runtime::{self, opaque::Block, RuntimeApi};
-use sc_service::{Configuration, PartialComponents, TaskManager, error::Error as ServiceError};
-use sp_inherents::{InherentDataProviders, ProvideInherentData};
-use sc_executor::native_executor_instance;
-pub use sc_executor::NativeExecutor;
+use sc_client_api::{ExecutorProvider, RemoteBackend, blockchain::HeaderBackend};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
+use sp_core::Decode;
+use sc_executor::native_executor_instance;
 use sc_finality_grandpa::SharedVoterState;
 use sc_keystore::LocalKeystore;
+use sp_inherents::{InherentDataProviders, ProvideInherentData};
+use sc_service::{Configuration, TaskManager, error::Error as ServiceError};
+use std::{path::PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 
-use std::{iter, net::Ipv4Addr};
-use libp2p::core::multiaddr::Protocol;
-
+pub use sc_executor::NativeExecutor;
 
 // Our native executor instance.
 native_executor_instance!(
@@ -54,15 +51,17 @@ impl ProvideInherentData for DataMap {
     }
 
     fn error_to_string(&self, error: &[u8]) -> Option<String> {
-        todo!()
+        sp_inherents::Error::decode(&mut &error[..]).map(|e| e.into_string()).ok()
     }
 }
 
-pub fn build_inherent_data_providers() -> Result<InherentDataProviders, ServiceError> {
+pub fn build_inherent_data_providers(key: String) -> Result<InherentDataProviders, ServiceError> {
 	let providers = InherentDataProviders::new();
 
+	let key_new= key.into_bytes();
+
 	providers
-		.register_provider(DataMap::new())
+		.register_provider(DataMap::new(key_new))
 		.map_err(Into::into)
 		.map_err(sp_consensus::error::Error::InherentData)?;
 
@@ -87,12 +86,15 @@ pub fn new_partial(config: &Configuration) -> Result<sc_service::PartialComponen
 		return Err(ServiceError::Other(
 			format!("Remote Keystores are not supported.")))
 	}
-	let inherent_data_providers =  build_inherent_data_providers()?;
-
+	
 	let (client, backend, keystore_container, task_manager) =
-		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
+	sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
 	let client = Arc::new(client);
 
+	let key = format!("{}", client.info().finalized_number);
+	
+	let inherent_data_providers =  build_inherent_data_providers(key)?;
+	
 	let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
 	let transaction_pool = sc_transaction_pool::BasicPool::new_full(
@@ -155,9 +157,8 @@ struct DataMap {
 }
 
 impl DataMap {
-	pub fn new() -> Self {
-		// let info = 
-		let key = Key::new(b"dhtdataM");
+	pub fn new(key: Vec<u8>) -> Self {
+		let key = Key::from(key);
 		Self {
 			key,
 			value: Default::default()
@@ -242,13 +243,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 	//event 50663.
 	
 	//request
-	
-	
-	config.network.listen_addresses = vec![
-        iter::once(Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)))
-        .chain(iter::once(Protocol::Tcp(0)))
-        .collect()
-        ];
 
 	let role = config.role.clone();
 	let force_authoring = config.force_authoring;
