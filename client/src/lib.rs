@@ -10,7 +10,6 @@ use frame_system::{ensure_none, ensure_signed, offchain::{
 	}};
 use sp_core::{crypto::KeyTypeId};
 use sp_io::offchain_index;
-use sp_api;
 use sp_runtime::{generic,
 	offchain as rt_offchain,
 	offchain::{
@@ -22,7 +21,7 @@ use sp_runtime::{generic,
 	},
 	RuntimeDebug,
 };
-use sp_runtime::traits::{BlakeTwo256, Block};
+use sp_runtime::traits::{BlakeTwo256};
 use sp_std::{collections::vec_deque::VecDeque, prelude::*, str};
 
 use serde::{
