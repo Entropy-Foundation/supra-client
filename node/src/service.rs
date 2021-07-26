@@ -218,7 +218,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 	config.network.enable_dht_random_walk = true;
 	
 	// Current best block at initialization, to report to the RPC layer.
-	let last_hash = client.info().best_hash;
+	let last_hash = client.info().finalized_hash;
 	let block_collected = format!("{}", last_hash.clone());
 	info!("Current block saved to peer DHT {:?}", block_collected);
 	
@@ -242,8 +242,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 	
 	//event 50663.
 	
-	//request
-
 	let role = config.role.clone();
 	let force_authoring = config.force_authoring;
 	let backoff_authoring_blocks: Option<()> = None;
