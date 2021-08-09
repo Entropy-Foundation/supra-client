@@ -82,6 +82,10 @@ Due to recent Substrate upgrade, paste the following custom types JSON in **Sett
 If you want to see the multi-node consensus algorithm in action, refer to
 [our Start a Private Network tutorial](https://substrate.dev/docs/en/tutorials/start-a-private-network/).
 
+## DHT Peer Behaviour
+
+
+
 ## Template Structure
 
 A Substrate project such as this consists of a number of components that are spread across a few

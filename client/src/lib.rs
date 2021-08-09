@@ -1,34 +1,37 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use core::fmt;
-use frame_support::{debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, storage::{StorageDecodeLength, StorageMap}, weights::Weight, Hashable};
-use parity_scale_codec::{Encode, Decode};
-
-use frame_system::{Origin, ensure_none, ensure_signed, offchain::{
-		AppCrypto, CreateSignedTransaction,
-		SignedPayload, Signer, SigningTypes, SubmitTransaction,
-	}};
-use sp_core::{crypto::KeyTypeId};
-use sp_core::offchain::OpaqueMultiaddr;
-use sp_io::offchain_index;
-use sp_api;
-use sp_runtime::{generic,
-	offchain as rt_offchain,
-	offchain::{
-		storage::StorageValueRef,
-		storage_lock::{BlockAndTime, StorageLock},
-	},
-	transaction_validity::{
-		InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
-	},
-	RuntimeDebug,
+use frame_support::{
+    debug, decl_error, decl_event, decl_module, decl_storage,
+    dispatch::DispatchResult
 };
-use sp_runtime::traits::{BlakeTwo256, Block};
+use parity_scale_codec::{Decode, Encode};
+
+use frame_system::{
+    ensure_none, ensure_signed,
+    offchain::{
+        AppCrypto, CreateSignedTransaction, SignedPayload, SigningTypes, SubmitTransaction,
+    },
+};
+use sp_core::crypto::KeyTypeId;
+use sp_io::offchain_index;
+use sp_runtime::traits::BlakeTwo256;
+use sp_runtime::{
+    generic, offchain as rt_offchain,
+    offchain::{
+        storage::StorageValueRef,
+        storage_lock::{BlockAndTime, StorageLock},
+    },
+    transaction_validity::{
+        InvalidTransaction, TransactionSource, TransactionValidity, ValidTransaction,
+    },
+    RuntimeDebug,
+};
 use sp_std::{collections::vec_deque::VecDeque, prelude::*, str};
 
 use serde::{
-	ser::{SerializeStruct, Serializer},
-	Deserialize, Deserializer, Serialize
+    ser::{SerializeStruct, Serializer},
+    Deserialize, Deserializer, Serialize,
 };
 #[macro_use]
 extern crate alloc;
@@ -40,7 +43,6 @@ pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
 /// `KeyTypeId` via the keystore to sign the transaction.
 /// The keys can be inserted manually via RPC (see `author_insertKey`).
 pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"demo");
-// const NUM_VEC_LEN: usize = 10;
 /// The type to sign and send transactions.
 const UNSIGNED_TXS_PRIORITY: u64 = 100;
 
@@ -61,466 +63,474 @@ const ONCHAIN_TX_KEY: &[u8] = b"ocw-demo::storage::tx";
 /// We can utilize the supported crypto kinds (`sr25519`, `ed25519` and `ecdsa`) and augment
 /// them with the pallet-specific identifier.
 pub mod crypto {
-	use crate::KEY_TYPE;
-	use sp_core::sr25519::Signature as Sr25519Signature;
-	use sp_runtime::app_crypto::{app_crypto, sr25519};
-	use sp_runtime::{traits::Verify, MultiSignature, MultiSigner};
+    use crate::KEY_TYPE;
+    use sp_core::sr25519::Signature as Sr25519Signature;
+    use sp_runtime::app_crypto::{app_crypto, sr25519};
+    use sp_runtime::{traits::Verify, MultiSignature, MultiSigner};
 
-	app_crypto!(sr25519, KEY_TYPE);
+    app_crypto!(sr25519, KEY_TYPE);
 
-	pub struct SupraAuthId;
-	// implemented for ocw-runtime
-	impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for SupraAuthId {
-		type RuntimeAppPublic = Public;
-		type GenericSignature = sp_core::sr25519::Signature;
-		type GenericPublic = sp_core::sr25519::Public;
-	}
+    pub struct SupraAuthId;
+    // implemented for ocw-runtime
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for SupraAuthId {
+        type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+        type GenericPublic = sp_core::sr25519::Public;
+    }
 
-	// implemented for mock runtime in test
-	impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
-		for SupraAuthId
-	{
-		type RuntimeAppPublic = Public;
-		type GenericSignature = sp_core::sr25519::Signature;
-		type GenericPublic = sp_core::sr25519::Public;
-	}
+    // implemented for mock runtime in test
+    impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
+        for SupraAuthId
+    {
+        type RuntimeAppPublic = Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+        type GenericPublic = sp_core::sr25519::Public;
+    }
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
 pub struct Payload<Public> {
-	number: u64,
-	public: Public,
+    number: u64,
+    public: Public,
 }
 
 impl<T: SigningTypes> SignedPayload<T> for Payload<T::Public> {
-	fn public(&self) -> T::Public {
-		self.public.clone()
-	}
+    fn public(&self) -> T::Public {
+        self.public.clone()
+    }
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
 pub struct EthPayLoad {
-	eth_host: Vec<u8>,
-	from_address: Vec<u8>,
-	to_address: Vec<u8>,
+    eth_host: Vec<u8>,
+    from_address: Vec<u8>,
+    to_address: Vec<u8>,
 }
 
 /// This is the pallet's configuration trait
 pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
     /// The identifier type for an offchain worker.
-	type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
-	/// The overarching dispatch call type.
-	type Call: From<Call<Self>>;
-	/// The overarching event type.
-	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+    type AuthorityId: AppCrypto<Self::Public, Self::Signature>;
+    /// The overarching dispatch call type.
+    type Call: From<Call<Self>>;
+    /// The overarching event type.
+    type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 }
 
 decl_storage! {
     trait Store for Module<T: Config> as OcwDemo {
         /// A vector of recently submitted numbers. Bounded by NUM_VEC_LEN
-		Numbers get(fn numbers): VecDeque<u64>;
-	}
+        Numbers get(fn numbers): VecDeque<u64>;
+    }
 }
 
 decl_event!(
     /// Events generated by the module.
-	pub enum Event<T>
-	where
-    AccountId = <T as frame_system::Config>::AccountId,
-	// TransactionHash = <T as frame_system::Config>::Hash,
-	{
+    pub enum Event<T>
+    where
+        AccountId = <T as frame_system::Config>::AccountId,
+    {
         /// Event generated when a new number is accepted to contribute to the average.
-		NewNumber(Option<AccountId>, u64),
-		/// Event fetching etherium price done and transaction made to ethereum.
-		UpdateEthereumPrice(Option<AccountId>),
-		/// Event submit etherium price done.
-		SubmitEthereumPrice(Option<AccountId>, Vec<u8>),
-	}
+        NewNumber(Option<AccountId>, u64),
+        /// Event fetching etherium price done and transaction made to ethereum.
+        UpdateEthereumPrice(Option<AccountId>),
+        /// Event submit etherium price done.
+        SubmitEthereumPrice(Option<AccountId>, Vec<u8>),
+    }
 );
 
 decl_error! {
     pub enum Error for Module<T: Config> {
-        // Error returned when not sure which ocw function to executed
-		UnknownOffchainMux,
-        
-		// Error returned when making signed transactions in off-chain worker
-		NoLocalAcctForSigning,
-		OffchainSignedTxError,
-        
-		// Error returned when making unsigned transactions in off-chain worker
-		OffchainUnsignedTxError,
-        
-		// Error returned when making unsigned transactions with signed payloads in off-chain worker
-		OffchainUnsignedTxSignedPayloadError,
-        
-		// Error returned when fetching github info
-		HttpFetchingError,
+        /// Error returned when not sure which ocw function to executed
+        UnknownOffchainMux,
 
-		// Error if not parsed in given struct
-		HttpNotParsedInStruct,
+        /// Error returned when making signed transactions in off-chain worker
+        NoLocalAcctForSigning,
+        OffchainSignedTxError,
 
-		// ParseFloatError
-		ParseFloatError,
+        /// Error returned when making unsigned transactions in off-chain worker
+        OffchainUnsignedTxError,
 
-		// Get Parameter Error
-		GetParamError,
-	}
+        /// Error returned when making unsigned transactions with signed payloads in off-chain worker
+        OffchainUnsignedTxSignedPayloadError,
+
+        /// Error returned when fetching github info
+        HttpFetchingError,
+
+        /// Error if not parsed in given struct
+        HttpNotParsedInStruct,
+
+        /// ParseFloatError
+        ParseFloatError,
+
+        /// Get Parameter Error
+        GetParamError,
+    }
 }
 
 decl_module! {
-    pub struct Module<T: Config> for enum Call 
-		where 	origin: T::Origin,
-	{
+    pub struct Module<T: Config> for enum Call
+        where 	origin: T::Origin,
+    {
         fn deposit_event() = default;
 
-		#[weight = 10000]
-		pub fn submit_ethereum_price(origin,ethereum_price: Vec<u8>) -> DispatchResult{
+        #[weight = 10000]
+        pub fn submit_ethereum_price(origin,ethereum_price: Vec<u8>) -> DispatchResult{
 
-			let who = ensure_none(origin)?;
+            let who = ensure_none(origin)?;
 
-			let price_in_str = str::from_utf8(&ethereum_price).unwrap_or("error");
-			
-			debug::info!("updated ethereum price: ({:?}, {:?})", price_in_str, who);
-			// debug::info!("inserted data {:?}", ethereum_price.to_vec());
+            let price_in_str = str::from_utf8(&ethereum_price).unwrap_or("error");
 
-			let key = Self::derived_key(frame_system::Module::<T>::block_number());
-			let data = IndexingPriceData(b"submit_ethereum_price".to_vec(), ethereum_price.to_vec());
-			offchain_index::set(&key, &data.encode());
+            debug::info!("updated ethereum price: ({:?}, {:?})", price_in_str, who);
 
-			Self::deposit_event(RawEvent::SubmitEthereumPrice(None,ethereum_price));
-			Ok(())
-		}
+            let key = Self::derived_key(frame_system::Module::<T>::block_number());
+            let data = IndexingPriceData(b"submit_ethereum_price".to_vec(), ethereum_price.to_vec());
+            offchain_index::set(&key, &data.encode());
 
-		#[weight = 10000]
-		pub fn update_ethereum_price(origin, eth_host:Vec<u8>, from_address:Vec<u8>, to_address:Vec<u8>) -> DispatchResult{
+            Self::deposit_event(RawEvent::SubmitEthereumPrice(None,ethereum_price));
+            Ok(())
+        }
 
-			let who = ensure_signed(origin)?;
-			
-			debug::info!("Block Number: {:?}",frame_system::Module::<T>::block_number());
+        #[weight = 10000]
+        pub fn update_ethereum_price(origin, eth_host:Vec<u8>, from_address:Vec<u8>, to_address:Vec<u8>) -> DispatchResult{
 
-			debug::info!("host: {:?}, from: {:?}, to: {:?}",eth_host, from_address, to_address);
+            let who = ensure_signed(origin)?;
 
-			let key = Self::derived_key(frame_system::Module::<T>::block_number());
-			// let EthPayLoad { eth_host, from_address, to_address } = eth_payload;
-			let data = IndexingPriceFlag(b"update_ethereum_price".to_vec(), eth_host, from_address, to_address);
-			offchain_index::set(&key, &data.encode());
+            debug::info!("Block Number: {:?}",frame_system::Module::<T>::block_number());
 
-			Self::deposit_event(RawEvent::UpdateEthereumPrice(Some(who)));
-			Ok(())
-		}
-        
-		fn offchain_worker(block_number: T::BlockNumber) {		
+            debug::info!("host: {:?}, from: {:?}, to: {:?}",eth_host, from_address, to_address);
+
+            let key = Self::derived_key(frame_system::Module::<T>::block_number());
+            // let EthPayLoad { eth_host, from_address, to_address } = eth_payload;
+            let data = IndexingPriceFlag(b"update_ethereum_price".to_vec(), eth_host, from_address, to_address);
+            offchain_index::set(&key, &data.encode());
+
+            Self::deposit_event(RawEvent::UpdateEthereumPrice(Some(who)));
+            Ok(())
+        }
+
+        fn offchain_worker(block_number: T::BlockNumber) {
             debug::info!("Entering off-chain worker");
-			debug::info!("off chain block number: {:?}", block_number);
-			
-			let key = Self::derived_key(block_number);
-			let oci_mem = StorageValueRef::persistent(&key);
+            debug::info!("off chain block number: {:?}", block_number);
 
-			if let Some(Some(edata)) = oci_mem.get::<IndexingPriceFlag>() {
-				let tran_name = str::from_utf8(&edata.0).unwrap_or("error");
-				if tran_name == "update_ethereum_price" {
+            let key = Self::derived_key(block_number);
+            let oci_mem = StorageValueRef::persistent(&key);
 
-					let eth_host = format!("0x{}",str::from_utf8(&edata.1).unwrap_or("error"));
-					let from_address = format!("0x{}",str::from_utf8(&edata.2).unwrap_or("error"));
-					let to_address = format!("0x{}",str::from_utf8(&edata.3).unwrap_or("error"));
+            if let Some(Some(edata)) = oci_mem.get::<IndexingPriceFlag>() {
+                let tran_name = str::from_utf8(&edata.0).unwrap_or("error");
+                if tran_name == "update_ethereum_price" {
 
-					let eth_host = eth_host.as_str();
-					let from_address = from_address.as_str();
-					let to_address = to_address.as_str();
+                    let eth_host = format!("0x{}",str::from_utf8(&edata.1).unwrap_or("error"));
+                    let from_address = format!("0x{}",str::from_utf8(&edata.2).unwrap_or("error"));
+                    let to_address = format!("0x{}",str::from_utf8(&edata.3).unwrap_or("error"));
 
-					debug::info!("host: {}, from: {}, to: {}",eth_host, from_address, to_address);
-					debug::info!("HOST: {}, FROM: {}, TO: {}", &eth_host, &from_address, &to_address);
-					let result = Self::update_ethereum_price_worker(eth_host, from_address, to_address);
-					if let Err(e) = result {
-						debug::error!("offchain_worker ethereum error: {:?}", e);
-					}
-				}
+                    let eth_host = eth_host.as_str();
+                    let from_address = from_address.as_str();
+                    let to_address = to_address.as_str();
+
+                    debug::info!("host: {}, from: {}, to: {}",eth_host, from_address, to_address);
+                    debug::info!("HOST: {}, FROM: {}, TO: {}", &eth_host, &from_address, &to_address);
+                    let result = Self::update_ethereum_price_worker(eth_host, from_address, to_address);
+                    if let Err(e) = result {
+                        debug::error!("offchain_worker ethereum error: {:?}", e);
+                    }
+                }
                 debug::info!("off-chain ethereum indexing data: {:?}",
                 tran_name);
-			} else {
+            } else {
                 debug::info!("no off-chain ethereum indexing data retrieved.");
-			}
-		}
-	}
+            }
+        }
+    }
 }
 
-impl<T: Config> Module<T> {    
-	pub fn derived_key(block_number: T::BlockNumber) -> Vec<u8> {
+impl<T: Config> Module<T> {
+    pub fn derived_key(block_number: T::BlockNumber) -> Vec<u8> {
         block_number.using_encoded(|encoded_bn| {
-            ONCHAIN_TX_KEY.clone().into_iter()
-            .chain(b"/".into_iter())
-            .chain(encoded_bn)
-            .copied()
-            .collect::<Vec<u8>>()
-		})
-	}
+            ONCHAIN_TX_KEY
+                .into_iter()
+                .chain(b"/".into_iter())
+                .chain(encoded_bn)
+                .copied()
+                .collect::<Vec<u8>>()
+        })
+    }
 
-	pub fn update_ethereum_price_worker(eth_host: &str, from_address: &str, to_address: &str) -> Result<(), Error<T>> {
+    pub fn update_ethereum_price_worker(
+        eth_host: &str,
+        from_address: &str,
+        to_address: &str,
+    ) -> Result<(), Error<T>> {
+        debug::info!("Called Update Ethereum price worker");
 
-		debug::info!("Called Update Ethereum price worker");
-		// let signer = Signer::<T, T::AuthorityId>::any_account();
-        
-		// let number: u64 = block_number.try_into().unwrap_or(0);
+        let s_info = StorageValueRef::persistent(b"ocw-demo::ethereum-info");
 
-		let s_info = StorageValueRef::persistent(b"ocw-demo::ethereum-info");
-
-		let mut lock = StorageLock::<BlockAndTime<Self>>::with_block_and_time_deadline(
+        let mut lock = StorageLock::<BlockAndTime<Self>>::with_block_and_time_deadline(
             b"ocw-demo::lock",
-			LOCK_BLOCK_EXPIRATION,
-			rt_offchain::Duration::from_millis(LOCK_TIMEOUT_EXPIRATION),
-		);
+            LOCK_BLOCK_EXPIRATION,
+            rt_offchain::Duration::from_millis(LOCK_TIMEOUT_EXPIRATION),
+        );
 
-		if let Ok(_guard) = lock.try_lock() {
-			match Self::fetch_n_parse() {
-				Ok(data) => {
+        if let Ok(_guard) = lock.try_lock() {
+            match Self::fetch_n_parse() {
+                Ok(data) => {
                     s_info.set(&data);
-				}
-				Err(err) => {
+                }
+                Err(err) => {
                     return Err(err);
-				}
-			}
-		}
-		
-		let final_price:Vec<u8>;
-		if let Some(Some(ethereum_price_data)) = s_info.get::<LightClient>() {
-			final_price = ethereum_price_data.price;	
-		} else {
-			final_price = "0".into();
-		}
+                }
+            }
+        }
 
-		let _result = Self::submt_price_to_ethereum(final_price.clone(), eth_host, from_address, to_address)?;
+        let final_price: Vec<u8>;
+        if let Some(Some(ethereum_price_data)) = s_info.get::<LightClient>() {
+            final_price = ethereum_price_data.price;
+        } else {
+            final_price = "0".into();
+        }
 
-		let resp_str = str::from_utf8(&_result).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        let _result =
+            Self::submt_price_to_ethereum(final_price.clone(), eth_host, from_address, to_address)?;
 
-		debug::info!("Response from ethereum: {:?}",resp_str);
+        let resp_str = str::from_utf8(&_result).map_err(|_| <Error<T>>::HttpFetchingError)?;
 
-		// Ok(())
+        debug::info!("Response from ethereum: {:?}", resp_str);
 
-		let call = Call::submit_ethereum_price(final_price.clone());
-        
-		// `submit_unsigned_transaction` returns a type of `Result<(), ()>`
-		//   ref: https://substrate.dev/rustdocs/v3.0.0/frame_system/offchain/struct.SubmitTransaction.html#method.submit_unsigned_transaction
-		SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
+        let call = Call::submit_ethereum_price(final_price.clone());
+
+        // `submit_unsigned_transaction` returns a type of `Result<(), ()>`
+        //   ref: https://substrate.dev/rustdocs/v3.0.0/frame_system/offchain/struct.SubmitTransaction.html#method.submit_unsigned_transaction
+        SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into()).map_err(|_| {
             debug::error!("Failed in update_ethereum_price_worker");
-			<Error<T>>::OffchainUnsignedTxError
-		})
-	}
-    
-	/// Fetch from remote and deserialize the JSON to a struct
-	fn fetch_n_parse() -> Result<LightClient, Error<T>> {
+            <Error<T>>::OffchainUnsignedTxError
+        })
+    }
+
+    /// Fetch from remote and deserialize the JSON to a struct
+    fn fetch_n_parse() -> Result<LightClient, Error<T>> {
         let resp_bytes = Self::fetch_from_remote().map_err(|e| {
             debug::error!("fetch_from_remote error: {:?}", e);
-			<Error<T>>::HttpFetchingError
-		})?;
-        
-		let resp_str = str::from_utf8(&resp_bytes).map_err(|_| <Error<T>>::HttpFetchingError)?;
-		// Print out our fetched JSON string
-		debug::info!("{}", resp_str);
+            <Error<T>>::HttpFetchingError
+        })?;
 
-		// Deserializing JSON to struct, thanks to `serde` and `serde_derive`
-		let data: LightClient = serde_json::from_str(&resp_str).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
-		Ok(data)
-	}
+        let resp_str = str::from_utf8(&resp_bytes).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        // Print out our fetched JSON string
+        debug::info!("{}", resp_str);
 
-	/// This function uses the `offchain::http` API to query the remote blockchain,
-	///   and returns the JSON response as vector of bytes.
-	pub fn fetch_from_remote() -> Result<Vec<u8>, Error<T>> {
-		debug::info!("sending request to: {}", HTTP_REMOTE_REQUEST);
-        
-		// Initiate an external HTTP GET request. This is using high-level wrappers from `sp_runtime`.
-		let request = rt_offchain::http::Request::get(HTTP_REMOTE_REQUEST);
-        
-		// Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
-		let timeout = sp_io::offchain::timestamp()
-        .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
-        
-		// For whatever API request, we also need to specify `user-agent` in http request header.
-		let pending = request
-        .add_header("User-Agent", HTTP_HEADER_USER_AGENT)
-		// .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
-        .deadline(timeout) // Setting the timeout time
-        .send() // Sending the request out by the host
-        .map_err(|_| <Error<T>>::HttpFetchingError)?;
-        
-		//   ref: https://substrate.dev/rustdocs/v3.0.0/sp_runtime/offchain/http/struct.PendingRequest.html#method.try_wait
-		let response = pending
-        .try_wait(timeout)
-        .map_err(|_| <Error<T>>::HttpFetchingError)?
-        .map_err(|_| <Error<T>>::HttpFetchingError)?;
-        
-		if response.code != 200 {
+        // Deserializing JSON to struct, thanks to `serde` and `serde_derive`
+        let data: LightClient =
+            serde_json::from_str(&resp_str).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
+        Ok(data)
+    }
+
+    /// This function uses the `offchain::http` API to query the remote blockchain,
+    ///   and returns the JSON response as vector of bytes.
+    pub fn fetch_from_remote() -> Result<Vec<u8>, Error<T>> {
+        debug::info!("sending request to: {}", HTTP_REMOTE_REQUEST);
+
+        // Initiate an external HTTP GET request. This is using high-level wrappers from `sp_runtime`.
+        let request = rt_offchain::http::Request::get(HTTP_REMOTE_REQUEST);
+
+        // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
+        let timeout = sp_io::offchain::timestamp()
+            .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
+
+        // For whatever API request, we also need to specify `user-agent` in http request header.
+        let pending = request
+            .add_header("User-Agent", HTTP_HEADER_USER_AGENT)
+            // .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
+            .deadline(timeout) // Setting the timeout time
+            .send() // Sending the request out by the host
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        //   ref: https://substrate.dev/rustdocs/v3.0.0/sp_runtime/offchain/http/struct.PendingRequest.html#method.try_wait
+        let response = pending
+            .try_wait(timeout)
+            .map_err(|_| <Error<T>>::HttpFetchingError)?
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        if response.code != 200 {
             debug::error!("Unexpected http request status code: {}", response.code);
-			return Err(<Error<T>>::HttpFetchingError);
-		}
-        
-		// Next we fully read the response body and collect it to a vector of bytes.
-		Ok(response.body().collect::<Vec<u8>>())
-	}
+            return Err(<Error<T>>::HttpFetchingError);
+        }
 
-	fn submt_price_to_ethereum(price: Vec<u8>, eth_host: &str, from_address: &str, to_address: &str) -> Result<Vec<u8>, Error<T>> {
-		let price_in_string:&str = str::from_utf8(&price).map_err(|_| <Error<T>>::HttpFetchingError)?;
-		debug::info!("Price in string{:?}",price_in_string);
-		let price_float = price_in_string.parse::<f32>().map_err(|_| <Error<T>>::ParseFloatError)?;
-		debug::info!("Price in float{:?}",price_float);
-		let _price_int = price_float as u32;		
+        // Next we fully read the response body and collect it to a vector of bytes.
+        Ok(response.body().collect::<Vec<u8>>())
+    }
 
-		let param = format!("{:x}", _price_int);
+    fn submt_price_to_ethereum(
+        price: Vec<u8>,
+        eth_host: &str,
+        from_address: &str,
+        to_address: &str,
+    ) -> Result<Vec<u8>, Error<T>> {
+        let price_in_string: &str =
+            str::from_utf8(&price).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        debug::info!("Price in string{:?}", price_in_string);
+        let price_float = price_in_string
+            .parse::<f32>()
+            .map_err(|_| <Error<T>>::ParseFloatError)?;
+        debug::info!("Price in float{:?}", price_float);
+        let _price_int = price_float as u32;
 
-    	let data2 = format!("0xd423740b{}{}", "0".repeat(64 - param.len()), param);
-		let data = data2.as_str();
-		debug::info!("Data: {}",data);
+        let param = format!("{:x}", _price_int);
 
-		//To be fixed
-		let gas_result = Self::get_estimated_gas(data, from_address, to_address).unwrap();
-		let gas_result_str = str::from_utf8(&gas_result).unwrap();
-		let gas_result_struct:EthResult = serde_json::from_str(gas_result_str).unwrap();
+        let data2 = format!("0xd423740b{}{}", "0".repeat(64 - param.len()), param);
+        let data = data2.as_str();
+        debug::info!("Data: {}", data);
 
-		let _params = EthParams{
-			from:from_address.into(),
-			to:to_address.into(),
-			value:"0x0".into(),
-			gas:gas_result_struct.result.into(),
-			gas_price:"0x1".into(),
-			data:data.into(),
-		};
+        //To be fixed
+        let gas_result = Self::get_estimated_gas(data, from_address, to_address).unwrap();
+        let gas_result_str = str::from_utf8(&gas_result).unwrap();
+        let gas_result_struct: EthResult = serde_json::from_str(gas_result_str).unwrap();
 
-		let mut params_vec = Vec::new();
-		params_vec.push(_params);
+        let _params = EthParams {
+            from: from_address.into(),
+            to: to_address.into(),
+            value: "0x0".into(),
+            gas: gas_result_struct.result.into(),
+            gas_price: "0x1".into(),
+            data: data.into(),
+        };
 
-		let _eth_transaction = EthTransaction{
-			jsonrpc:"2.0".into(),
-			id:2u8,
-			method:"eth_sendTransaction".into(),
-			params:params_vec
-		};
+        let mut params_vec = Vec::new();
+        params_vec.push(_params);
 
-		let _json_data = serde_json::to_vec(&_eth_transaction).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
-		let _body:&[u8] = &_json_data;
-		// let bbody = &*_body.clone();
-		let body_str = str::from_utf8(_body).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        let _eth_transaction = EthTransaction {
+            jsonrpc: "2.0".into(),
+            id: 2u8,
+            method: "eth_sendTransaction".into(),
+            params: params_vec,
+        };
 
-		debug::info!("jsonString: {:?}", body_str);
+        let _json_data =
+            serde_json::to_vec(&_eth_transaction).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
+        let _body: &[u8] = &_json_data;
+        // let bbody = &*_body.clone();
+        let body_str = str::from_utf8(_body).map_err(|_| <Error<T>>::HttpFetchingError)?;
 
-		let request = rt_offchain::http::Request::post(eth_host,vec![_body]);
-        
-		// Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
-		let timeout = sp_io::offchain::timestamp()
-        .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
-        
-		// // For whatever API request, we also need to specify `user-agent` in http request header.
-		let pending = request
-        .add_header("Content-Type", "application/json")
-		// // .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
-        .deadline(timeout) // Setting the timeout time
-        .send() // Sending the request out by the host
-        .map_err(|_| <Error<T>>::HttpFetchingError)?;
-        
-		// //   ref: https://substrate.dev/rustdocs/v3.0.0/sp_runtime/offchain/http/struct.PendingRequest.html#method.try_wait
-		let response = pending
-        .try_wait(timeout)
-        .map_err(|_| <Error<T>>::HttpFetchingError)?
-        .map_err(|_| <Error<T>>::HttpFetchingError)?;
-        
-		if response.code != 200 {
+        debug::info!("jsonString: {:?}", body_str);
+
+        let request = rt_offchain::http::Request::post(eth_host, vec![_body]);
+
+        // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
+        let timeout = sp_io::offchain::timestamp()
+            .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
+
+        // For whatever API request, we also need to specify `user-agent` in http request header.
+        let pending = request
+            .add_header("Content-Type", "application/json")
+            // // .add_header("Authorization", "Basic ZGhhdmFsOjEyMzQ1Njc4")
+            .deadline(timeout) // Setting the timeout time
+            .send() // Sending the request out by the host
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        // //   ref: https://substrate.dev/rustdocs/v3.0.0/sp_runtime/offchain/http/struct.PendingRequest.html#method.try_wait
+        let response = pending
+            .try_wait(timeout)
+            .map_err(|_| <Error<T>>::HttpFetchingError)?
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        if response.code != 200 {
             debug::error!("Unexpected http request status code: {}", response.code);
-			return Err(<Error<T>>::HttpFetchingError);
-		}
-        
-		// // Next we fully read the response body and collect it to a vector of bytes.
-		Ok(response.body().collect::<Vec<u8>>())
-	}
+            return Err(<Error<T>>::HttpFetchingError);
+        }
 
-	fn get_estimated_gas(data:&str, from_address: &str, to_address: &str) -> Result<Vec<u8>, Error<T>> {
-		debug::info!("Sending request to for gas price: {}", HTTP_ETHEREUM_HOST);
+        // // Next we fully read the response body and collect it to a vector of bytes.
+        Ok(response.body().collect::<Vec<u8>>())
+    }
 
-		let gas_request_param = GasRequestParam{
-			from:from_address.into(),
-			to:to_address.into(),
-			value:"0x0".into(),
-			data: data.into(),
-		};
+    fn get_estimated_gas(
+        data: &str,
+        from_address: &str,
+        to_address: &str,
+    ) -> Result<Vec<u8>, Error<T>> {
+        debug::info!("Sending request to for gas price: {}", HTTP_ETHEREUM_HOST);
 
-		let mut param_vec = Vec::new();
-		param_vec.push(gas_request_param);
+        let gas_request_param = GasRequestParam {
+            from: from_address.into(),
+            to: to_address.into(),
+            value: "0x0".into(),
+            data: data.into(),
+        };
 
-		let estimate_gas_req = EstimateGasRequest {
-			jsonrpc : "2.0".into(),
-			id:20u8,
-			method:"eth_estimateGas".into(),
-			params:param_vec,
-		};
+        let mut param_vec = Vec::new();
+        param_vec.push(gas_request_param);
 
-		let _json_data = serde_json::to_vec(&estimate_gas_req).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
-		let _body:&[u8] = &_json_data;
+        let estimate_gas_req = EstimateGasRequest {
+            jsonrpc: "2.0".into(),
+            id: 20u8,
+            method: "eth_estimateGas".into(),
+            params: param_vec,
+        };
 
-		let body_str = str::from_utf8(_body).map_err(|_| <Error<T>>::HttpFetchingError)?;
+        let _json_data =
+            serde_json::to_vec(&estimate_gas_req).map_err(|_| <Error<T>>::HttpNotParsedInStruct)?;
+        let _body: &[u8] = &_json_data;
 
-		debug::info!("gas request jsonString: {:?}", body_str);
-        
-		// Initiate an external HTTP GET request. This is using high-level wrappers from `sp_runtime`.
-		let request = rt_offchain::http::Request::post(HTTP_ETHEREUM_HOST, vec![_body]);
-        
-		// Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
-		let timeout = sp_io::offchain::timestamp()
-        .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
-        
-		let pending = request
-		.add_header("Content-Type", "application/json")
-        .deadline(timeout) // Setting the timeout time
-        .send() // Sending the request out by the host
-        .map_err(|_| <Error<T>>::HttpFetchingError)?;
-        
-		let response = pending
-        .try_wait(timeout)
-        .map_err(|_| <Error<T>>::HttpFetchingError)?
-        .map_err(|_| <Error<T>>::HttpFetchingError)?;
-        
-		if response.code != 200 {
-            debug::error!("Unexpected http request status code for gas price: {}", response.code);
-			return Err(<Error<T>>::HttpFetchingError);
-		}
-        
-		// Next we fully read the response body and collect it to a vector of bytes.
-		Ok(response.body().collect::<Vec<u8>>())
-	}
+        let body_str = str::from_utf8(_body).map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        debug::info!("gas request jsonString: {:?}", body_str);
+
+        // Initiate an external HTTP GET request. This is using high-level wrappers from `sp_runtime`.
+        let request = rt_offchain::http::Request::post(HTTP_ETHEREUM_HOST, vec![_body]);
+
+        // Keeping the offchain worker execution time reasonable, so limiting the call to be within 3s.
+        let timeout = sp_io::offchain::timestamp()
+            .add(rt_offchain::Duration::from_millis(FETCH_TIMEOUT_PERIOD));
+
+        let pending = request
+            .add_header("Content-Type", "application/json")
+            .deadline(timeout) // Setting the timeout time
+            .send() // Sending the request out by the host
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        let response = pending
+            .try_wait(timeout)
+            .map_err(|_| <Error<T>>::HttpFetchingError)?
+            .map_err(|_| <Error<T>>::HttpFetchingError)?;
+
+        if response.code != 200 {
+            debug::error!(
+                "Unexpected http request status code for gas price: {}",
+                response.code
+            );
+            return Err(<Error<T>>::HttpFetchingError);
+        }
+
+        // Next we fully read the response body and collect it to a vector of bytes.
+        Ok(response.body().collect::<Vec<u8>>())
+    }
 }
-
 
 impl<T: Config> frame_support::unsigned::ValidateUnsigned for Module<T> {
     type Call = Call<T>;
-    
-	fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+
+    fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
         let valid_tx = |provide| {
             ValidTransaction::with_tag_prefix("ocw-demo") //TODO: change prefix tag
-            .priority(UNSIGNED_TXS_PRIORITY)
-            .and_provides([&provide])
-            .longevity(3)
-            .propagate(true)
-				.build()
-            };
-            
-            match call {
-                //Call::submit_number_unsigned(_number) => valid_tx(b"submit_number_unsigned".to_vec()),
+                .priority(UNSIGNED_TXS_PRIORITY)
+                .and_provides([&provide])
+                .longevity(3)
+                .propagate(true)
+                .build()
+        };
 
-                //Call::submit_number_unsigned_with_signed_payload(ref payload, ref signature) => {
-                //    if !SignedPayload::<T>::verify::<T::AuthorityId>(payload, signature.clone()) {
-                //        return InvalidTransaction::BadProof.into();
-                //    }
-                //    valid_tx(b"submit_number_unsigned_with_signed_payload".to_vec())
-                //},
-
-				Call::submit_ethereum_price(_ethereum_price) => valid_tx(b"submit_ethereum_price".to_vec()),
-                
-                _ => InvalidTransaction::Call.into(),
+        match call {
+            Call::submit_ethereum_price(_ethereum_price) => {
+                valid_tx(b"submit_ethereum_price".to_vec())
             }
-	}
+
+            _ => InvalidTransaction::Call.into(),
+        }
+    }
 }
 
 impl<T: Config> rt_offchain::storage_lock::BlockNumberProvider for Module<T> {
     type BlockNumber = T::BlockNumber;
-	fn current_block_number() -> Self::BlockNumber {
+    fn current_block_number() -> Self::BlockNumber {
         <frame_system::Module<T>>::block_number()
-	}
+    }
 }
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
@@ -530,190 +540,184 @@ struct IndexingData(Vec<u8>, u64);
 struct IndexingPriceData(Vec<u8>, Vec<u8>);
 
 #[derive(Debug, Deserialize, Encode, Decode, Default)]
-struct IndexingPriceFlag(Vec<u8>,Vec<u8>,Vec<u8>,Vec<u8>);
+struct IndexingPriceFlag(Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 
 #[derive(Deserialize, Encode, Decode, Default)]
 struct LightClient {
-    // Specify our own deserializing function to convert JSON string to vector of bytes
-	// #[serde(deserialize_with = "de_string_to_bytes")]
-	// header: Vec<u8>,
-	// block: u8,
-    // public_repos: u32,
-	// {"trade_id":123560925,"price":"2726.25","size":"0.07600729","time":"2021-05-27T06:28:47.05024Z","bid":"2726.73","ask":"2726.74","volume":"517961.94817769"}
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	price: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	time: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    price: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    time: Vec<u8>,
 }
 
 pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
-where D: Deserializer<'de> {
+where
+    D: Deserializer<'de>,
+{
     let s: &str = Deserialize::deserialize(de)?;
     Ok(s.as_bytes().to_vec())
 }
 
 impl fmt::Debug for LightClient {
-	// `fmt` converts the vector of bytes inside the struct back to string for
-	//   more friendly display.
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"{{ price: {}, time: {} }}",
-			// &self.price,
-			str::from_utf8(&self.price).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.time).map_err(|_| fmt::Error)?,
-			// &self.time,
-		)
-	}
+    // `fmt` converts the vector of bytes inside the struct back to string for
+    //   more friendly display.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ price: {}, time: {} }}",
+            // &self.price,
+            str::from_utf8(&self.price).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.time).map_err(|_| fmt::Error)?,
+            // &self.time,
+        )
+    }
 }
 
 #[derive(Deserialize, Encode, Decode, Default)]
 struct EthTransaction {
     // Specify our own deserializing function to convert JSON string to vector of bytes
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	jsonrpc: Vec<u8>,
-	id: u8,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	method: Vec<u8>,
-	params: Vec<EthParams>
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    jsonrpc: Vec<u8>,
+    id: u8,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    method: Vec<u8>,
+    params: Vec<EthParams>,
 }
 
 #[derive(Deserialize, Encode, Decode, Default)]
 struct EthParams {
     // Specify our own deserializing function to convert JSON string to vector of bytes
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	from: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	to: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	data: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	value: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	gas: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes",rename="gasPrice")]
-	gas_price: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    from: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    to: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    data: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    value: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    gas: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes", rename = "gasPrice")]
+    gas_price: Vec<u8>,
 }
 
 #[derive(Deserialize, Encode, Decode, Default)]
 struct EstimateGasRequest {
     // Specify our own deserializing function to convert JSON string to vector of bytes
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	jsonrpc: Vec<u8>,
-	id: u8,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	method: Vec<u8>,
-	params: Vec<GasRequestParam>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    jsonrpc: Vec<u8>,
+    id: u8,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    method: Vec<u8>,
+    params: Vec<GasRequestParam>,
 }
 
 #[derive(Deserialize, Encode, Decode, Default)]
 struct GasRequestParam {
     // Specify our own deserializing function to convert JSON string to vector of bytes
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	from: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	to: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	data: Vec<u8>,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	value: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    from: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    to: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    data: Vec<u8>,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    value: Vec<u8>,
 }
 
 impl fmt::Debug for EthTransaction {
-	// `fmt` converts the vector of bytes inside the struct back to string for
-	//   more friendly display.
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"{{ jsonrpc: {}, id: {},method: {},params: [{:?}]  }}",
-			// &self.price,
-			str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
-			&self.id,
-			str::from_utf8(&self.method).map_err(|_| fmt::Error)?,
-			&self.params,
-			// &self.time,
-		)
-	}
+    // `fmt` converts the vector of bytes inside the struct back to string for
+    //   more friendly display.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ jsonrpc: {}, id: {},method: {},params: [{:?}]  }}",
+            // &self.price,
+            str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
+            &self.id,
+            str::from_utf8(&self.method).map_err(|_| fmt::Error)?,
+            &self.params,
+            // &self.time,
+        )
+    }
 }
 
 impl fmt::Debug for EthParams {
-	// `fmt` converts the vector of bytes inside the struct back to string for
-	//   more friendly display.
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"{{ from: {}, to: {}, data: {}, value: {},gas: {}, gasPrice: {} }}",
-			// &self.price,
-			str::from_utf8(&self.from).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.to).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.data).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.value).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.gas).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.gas_price).map_err(|_| fmt::Error)?,
-			// &self.time,
-		)
-	}
+    // `fmt` converts the vector of bytes inside the struct back to string for
+    //   more friendly display.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ from: {}, to: {}, data: {}, value: {},gas: {}, gasPrice: {} }}",
+            // &self.price,
+            str::from_utf8(&self.from).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.to).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.data).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.value).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.gas).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.gas_price).map_err(|_| fmt::Error)?,
+            // &self.time,
+        )
+    }
 }
 
 impl fmt::Debug for EstimateGasRequest {
-	// `fmt` converts the vector of bytes inside the struct back to string for
-	//   more friendly display.
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"{{ jsonrpc: {}, id: {},method: {},params: [{:?}]  }}",
-			// &self.price,
-			str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
-			&self.id,
-			str::from_utf8(&self.method).map_err(|_| fmt::Error)?,
-			&self.params,
-			// &self.time,
-		)
-	}
+    // `fmt` converts the vector of bytes inside the struct back to string for
+    //   more friendly display.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ jsonrpc: {}, id: {},method: {},params: [{:?}]  }}",
+            // &self.price,
+            str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
+            &self.id,
+            str::from_utf8(&self.method).map_err(|_| fmt::Error)?,
+            &self.params,
+            // &self.time,
+        )
+    }
 }
 
 impl fmt::Debug for GasRequestParam {
-	// `fmt` converts the vector of bytes inside the struct back to string for
-	//   more friendly display.
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"{{ from: {}, to: {}, data: {}, value: {} }}",
-			// &self.price,
-			str::from_utf8(&self.from).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.to).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.data).map_err(|_| fmt::Error)?,
-			str::from_utf8(&self.value).map_err(|_| fmt::Error)?,
-			// &self.time,
-		)
-	}
+    // `fmt` converts the vector of bytes inside the struct back to string for
+    //   more friendly display.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ from: {}, to: {}, data: {}, value: {} }}",
+            // &self.price,
+            str::from_utf8(&self.from).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.to).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.data).map_err(|_| fmt::Error)?,
+            str::from_utf8(&self.value).map_err(|_| fmt::Error)?,
+            // &self.time,
+        )
+    }
 }
 
 #[derive(Deserialize, Serialize, Encode, Decode, Default)]
 struct EthResult {
     // Specify our own deserializing function to convert JSON string to vector of bytes
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	jsonrpc: Vec<u8>,
-	id: u8,
-	#[serde(deserialize_with = "de_string_to_bytes")]
-	result: Vec<u8>,	
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    jsonrpc: Vec<u8>,
+    id: u8,
+    #[serde(deserialize_with = "de_string_to_bytes")]
+    result: Vec<u8>,
 }
 
 impl fmt::Debug for EthResult {
-	// `fmt` converts the vector of bytes inside the struct back to string for
-	//   more friendly display.
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"{{ jsonrpc: {}, id: {},result: {} }}",
-			// &self.price,
-			str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
-			&self.id,
-			str::from_utf8(&self.result).map_err(|_| fmt::Error)?,
-			// &self.params,
-			// &self.time,
-		)
-	}
+    // `fmt` converts the vector of bytes inside the struct back to string for
+    //   more friendly display.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ jsonrpc: {}, id: {},result: {} }}",
+            // &self.price,
+            str::from_utf8(&self.jsonrpc).map_err(|_| fmt::Error)?,
+            &self.id,
+            str::from_utf8(&self.result).map_err(|_| fmt::Error)?,
+        )
+    }
 }
 
 impl Serialize for EthParams {
@@ -721,12 +725,11 @@ impl Serialize for EthParams {
     where
         S: Serializer,
     {
-        // 6 is the number of fields in the struct.
         let mut state = serializer.serialize_struct("EthParams", 6)?;
         state.serialize_field("from", str::from_utf8(&self.from).unwrap())?;
         state.serialize_field("to", str::from_utf8(&self.to).unwrap())?;
         state.serialize_field("data", str::from_utf8(&self.data).unwrap())?;
-		state.serialize_field("value", str::from_utf8(&self.value).unwrap())?;
+        state.serialize_field("value", str::from_utf8(&self.value).unwrap())?;
         state.serialize_field("gas", str::from_utf8(&self.gas).unwrap())?;
         state.serialize_field("gasPrice", str::from_utf8(&self.gas_price).unwrap())?;
         state.end()
@@ -738,12 +741,11 @@ impl Serialize for EthTransaction {
     where
         S: Serializer,
     {
-        // 6 is the number of fields in the struct.
         let mut state = serializer.serialize_struct("EthParams", 4)?;
         state.serialize_field("jsonrpc", str::from_utf8(&self.jsonrpc).unwrap())?;
         state.serialize_field("id", &self.id)?;
         state.serialize_field("method", str::from_utf8(&self.method).unwrap())?;
-		state.serialize_field("params", &self.params)?;
+        state.serialize_field("params", &self.params)?;
         state.end()
     }
 }
@@ -753,12 +755,11 @@ impl Serialize for EstimateGasRequest {
     where
         S: Serializer,
     {
-        // 6 is the number of fields in the struct.
         let mut state = serializer.serialize_struct("EthParams", 4)?;
         state.serialize_field("jsonrpc", str::from_utf8(&self.jsonrpc).unwrap())?;
         state.serialize_field("id", &self.id)?;
         state.serialize_field("method", str::from_utf8(&self.method).unwrap())?;
-		state.serialize_field("params", &self.params)?;
+        state.serialize_field("params", &self.params)?;
         state.end()
     }
 }
@@ -768,12 +769,11 @@ impl Serialize for GasRequestParam {
     where
         S: Serializer,
     {
-        // 6 is the number of fields in the struct.
         let mut state = serializer.serialize_struct("EthParams", 4)?;
         state.serialize_field("from", str::from_utf8(&self.from).unwrap())?;
         state.serialize_field("to", str::from_utf8(&self.to).unwrap())?;
         state.serialize_field("data", str::from_utf8(&self.data).unwrap())?;
-		state.serialize_field("value", str::from_utf8(&self.value).unwrap())?;
+        state.serialize_field("value", str::from_utf8(&self.value).unwrap())?;
         state.end()
     }
 }
