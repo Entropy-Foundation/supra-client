@@ -2,8 +2,7 @@
 
 use core::fmt;
 use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage,
-    dispatch::DispatchResult
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult,
 };
 use parity_scale_codec::{Decode, Encode};
 
@@ -232,7 +231,7 @@ decl_module! {
                     debug::info!("HOST: {}, FROM: {}, TO: {}", &eth_host, &from_address, &to_address);
                     let result = Self::update_ethereum_price_worker(eth_host, from_address, to_address);
                     if let Err(e) = result {
-                        debug::error!("offchain_worker ethereum error: {:?}", e);
+                        debug::error!("off-chain_worker ethereum error: {:?}", e);
                     }
                 }
                 debug::info!("off-chain ethereum indexing data: {:?}",
