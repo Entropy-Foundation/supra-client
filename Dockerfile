@@ -1,5 +1,4 @@
-FROM rust@sha256:c0a933dca3319a5256b16197d9709fed7fc0055995d40d6ac822e9f613480361 AS base-stage
-#RUN cargo install cargo-chef
+FROM rust@sha256:c0a933dca3319a5256b16197d9709fed7fc0055995d40d6ac822e9f613480361
 
 WORKDIR /app
 
