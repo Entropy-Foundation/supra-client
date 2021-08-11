@@ -1,4 +1,4 @@
-# Supra (Modified Substrate)
+# Supra
 
 ### Rust Setup
 
@@ -76,11 +76,6 @@ Due to recent Substrate upgrade, paste the following custom types JSON in **Sett
   "AccountInfo": "AccountInfoWithDualRefCount"
 }
 ```
-
-### Multi-Node Local Testnet
-
-If you want to see the multi-node consensus algorithm in action, refer to
-[our Start a Private Network tutorial](https://substrate.dev/docs/en/tutorials/start-a-private-network/).
 
 ## DHT Peer Behaviour
 
