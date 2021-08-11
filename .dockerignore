@@ -1,5 +1,21 @@
+# Editor specific files
+**/.vscode
+**/.idea
+.editorconfig
+
+# Git
 **/.gitignore
 **/.github
-**/.vscode
-**/target
+
+# Project files not required for build
+.envrc
+docker-compose.yml
+LICENSE
+README.md
+shell.nix
 **/docs
+**/scripts
+
+# Local build artifacts
+**/target
+
