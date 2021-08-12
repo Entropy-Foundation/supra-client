@@ -1,51 +1,31 @@
-FROM debian:buster-slim
+FROM debian:stretch-slim
 
-WORKDIR /usr/scr/supra
+# show backtraces
+ENV RUST_BACKTRACE 1
 
+# install tools and dependencies
 RUN apt-get update && \
-    apt-get install -y git clang curl libssl-dev llvm libudev-dev
+	DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+	DEBIAN_FRONTEND=noninteractive apt-get install -y \
+		libssl1.1 \
+		ca-certificates \
+		curl && \
+# apt cleanup
+	apt-get autoremove -y && \
+	apt-get clean && \
+	find /var/lib/apt/lists/ -type f -not -name lock -delete; \
+# add user
+	useradd -m -u 1000 -U -s /bin/sh -d /supra supra
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# add supra binary to docker image
+COPY ./target/release/supra /usr/local/bin
 
-ENV PATH="/root/.cargo/bin:${PATH}"
-RUN	rustup target add wasm32-unknown-unknown && \
-    rustup default nightly-2021-07-05
+USER supra
 
-COPY . .
+# check if executable works in this container
+RUN /usr/local/bin/supra -h
 
-RUN cargo build --release
+EXPOSE 30333 9933 9944
+VOLUME ["/supra"]
 
-
-# FROM rust:latest
-
-# WORKDIR /usr/scr/supra
-
-# COPY . .
-
-# RUN apt-get update && \
-#     apt-get install -y git clang curl libssl-dev llvm libudev-dev 
-
-# RUN rustup default nightly
-# RUN rustup target add wasm32-unknown-unknown --toolchain nightly
-
-# RUN cargo build --release
-
-
-
-# FROM ubuntu
-
-# WORKDIR /usr/scr/supra
-
-# COPY . .
-
-# RUN apt-get update && \
-#     apt-get install -y git clang curl libssl-dev llvm libudev-dev 
-
-# RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-# ENV PATH="/root/.cargo/bin:${PATH}"
-# RUN	rustup toolchain install nightly && \
-# 	rustup target add wasm32-unknown-unknown --toolchain nightly && \
-#     rustup default nightly
-
-# RUN cargo build --release
+ENTRYPOINT ["/usr/local/bin/supra"]
