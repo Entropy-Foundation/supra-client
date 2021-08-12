@@ -5,7 +5,9 @@
 
 # Git
 **/.gitignore
+**/.git
 **/.github
+**/.devcontainer
 
 # Project files not required for build
 .envrc
