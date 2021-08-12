@@ -1,4 +1,4 @@
-# Supra (Modified Substrate)
+# Supra 
 
 ### Using Nix
 
