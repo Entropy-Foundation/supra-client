@@ -13,9 +13,7 @@ RUN cargo build --release \
 FROM rust:1.54.0-buster as runtime
 COPY --from=planner /usr/local/bin/supra-dht /usr/local/bin/
 COPY --from=planner /usr/local/bin/sub* /usr/local/bin/
-
 EXPOSE 30333 9933 9944
-
 CMD ["supra-dht", \
   "--base-path", "/tmp/alice", \
   "--chain", "local", \
