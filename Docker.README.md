@@ -3,7 +3,7 @@
 ## Run node with _Alice_ as authority
 
 ```bash
-docker run -it supra-client
+docker run -it -p 30333:30333 -p 9944:9944 -p 9933:9933 supra-client:0.0.1
 ```
 
 It executes the following command:-
