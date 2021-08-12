@@ -231,7 +231,7 @@ decl_module! {
                     debug::info!("HOST: {}, FROM: {}, TO: {}", &eth_host, &from_address, &to_address);
                     let result = Self::update_ethereum_price_worker(eth_host, from_address, to_address);
                     if let Err(e) = result {
-                        debug::error!("off-chain_worker ethereum error: {:?}", e);
+                        debug::error!("offchain_worker ethereum error: {:?}", e);
                     }
                 }
                 debug::info!("off-chain ethereum indexing data: {:?}",
