@@ -3,4 +3,4 @@
 
 cargo build --release
 
-./target/release/node-template --dev --tmp --enable-offchain-indexing true
+./target/release/supra --dev --tmp --enable-offchain-indexing true
