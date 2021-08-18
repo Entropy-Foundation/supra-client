@@ -5,13 +5,13 @@ The Image exposes 3 ports `30333` `9933` `9944` which would need to be mapped to
 ## Run node with _Alice_ as authority
 
 ```bash
-docker run -it -p 30333:30333 -p 9944:9944 -p 9933:9933 supra-client:0.0.1
+docker run -it -p 30333:30333 -p 9944:9944 -p 9933:9933 supra-client
 ```
 
 It executes the following command:-
 
 ```bash
-supra-dht \
+supra \
   --base-path /tmp/alice \
   --chain local \
   --alice \
@@ -27,7 +27,7 @@ supra-dht \
 ## Run another node
 
 ```bash
-docker run -it -p 30334:30333 -p 9945:9944 -p 9934:9933 supra-client:0.0.1 supra-dht \
+docker run -it -p 30334:30333 -p 9945:9944 -p 9934:9933 supra-client supra  \
   --base-path /tmp/bob \
   --chain local \
   --bob \
