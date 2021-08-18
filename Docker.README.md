@@ -1,4 +1,4 @@
-# Supra DHT
+# Supra
 
 The Image exposes 3 ports `30333` `9933` `9944` which would need to be mapped to host ports appropriately.
 
@@ -27,7 +27,7 @@ supra \
 ## Run another node
 
 ```bash
-docker run -it -p 30334:30333 -p 9945:9944 -p 9934:9933 supra-client supra  \
+docker run -it -p 30334:30333 -p 9945:9944 -p 9934:9933 supra-client \
   --base-path /tmp/bob \
   --chain local \
   --bob \
