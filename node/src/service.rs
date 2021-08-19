@@ -1,8 +1,8 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 use libp2p_kad::record::Key;
-use node_template_runtime::debug::info;
-use node_template_runtime::{self, opaque::Block, RuntimeApi};
+use supra_runtime::debug::info;
+use supra_runtime::{self, opaque::Block, RuntimeApi};
 use sc_client_api::{blockchain::HeaderBackend, ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
 use sc_finality_grandpa::SharedVoterState;
@@ -20,8 +20,8 @@ pub use sc_executor::NativeExecutor;
 // Our native executor instance.
 native_executor_instance!(
     pub Executor,
-    node_template_runtime::api::dispatch,
-    node_template_runtime::native_version,
+    supra_runtime::api::dispatch,
+    supra_runtime::native_version,
     frame_benchmarking::benchmarking::HostFunctions,
 );
 
