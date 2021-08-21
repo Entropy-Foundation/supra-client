@@ -342,13 +342,13 @@ where
 
 parameter_types! {
     pub const MaxWellKnownNodes: u32 = 8;
-    pub const MaxPeerIdlenght: u32 = 128;
+    pub const MaxPeerIdLength: u32 = 128;
 }
 
 impl supra_authorization::Config for Runtime {
     type Event = Event;
     type MaxWellKnownNodes = MaxWellKnownNodes;
-    type MaxPeerIdlenght = MaxPeerIdlenght;
+    type MaxPeerIdLength = MaxPeerIdLength;
     type AddOrigin = EnsureRoot<AccountId>;
     type RemoveOrigin = EnsureRoot<AccountId>;
     type SwapOrigin = EnsureRoot<AccountId>;
@@ -375,7 +375,6 @@ construct_runtime!(
         TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
         LightClient: client::{Module, Call, Storage, Event<T>, ValidateUnsigned},
         SupraAuthorization: supra_authorization::{Module, Call, Storage, Event<T>, Config<T>}
-
     }
 );
 
