@@ -11,9 +11,9 @@ RUN cargo build --release \
     && rm -rf /tmp && rm -rf /usr/local/rustup && rm -rf /usr/local/cargo
 
 FROM debian:buster-slim as runtime
-WORKDIR /app
 COPY --from=planner /usr/local/bin/supra /usr/local/bin/
 COPY --from=planner /usr/local/bin/sub* /usr/local/bin/
-COPY --from=planner docker.script.sh ./supra
+WORKDIR /app
+COPY --from=planner /app/docker.script.sh ./supra
 EXPOSE 30333 9933 9944
 ENTRYPOINT ["./supra"]
