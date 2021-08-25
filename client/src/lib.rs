@@ -2,8 +2,7 @@
 
 use core::fmt;
 use frame_support::{
-    debug, decl_error, decl_event, decl_module, decl_storage,
-    dispatch::DispatchResult
+    debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult,
 };
 use parity_scale_codec::{Decode, Encode};
 

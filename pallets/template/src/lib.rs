@@ -33,8 +33,9 @@ pub mod pallet {
 
     // The pallet's runtime storage items.
     // https://substrate.dev/docs/en/knowledgebase/runtime/storage
-    #[pallet::storage] 
-    pub(super) type Proofs<T: Config> = StorageMap<_, Blake2_128Concat, Vec<u8>, (T::AccountId, T::BlockNumber), ValueQuery>;   
+    #[pallet::storage]
+    pub(super) type Proofs<T: Config> =
+        StorageMap<_, Blake2_128Concat, Vec<u8>, (T::AccountId, T::BlockNumber), ValueQuery>;
 
     // Pallets use events to inform users when important changes are made.
     // https://substrate.dev/docs/en/knowledgebase/runtime/events
@@ -72,14 +73,16 @@ pub mod pallet {
             origin: OriginFor<T>,
             proof: Vec<u8>,
         ) -> DispatchResultWithPostInfo {
-
             // Check that the extrinsic was signed and get the signer.
             // This function will return an error if the extrinsic is not signed.
             // https://substrate.dev/docs/en/knowledgebase/runtime/origin
             let sender = ensure_signed(origin)?;
-        
-            // Verify that the specified proof has not already been claimed.         
-            ensure!(!Proofs::<T>::contains_key(&proof), Error::<T>::ProofAlreadyClaimed);
+
+            // Verify that the specified proof has not already been claimed.
+            ensure!(
+                !Proofs::<T>::contains_key(&proof),
+                Error::<T>::ProofAlreadyClaimed
+            );
 
             // Get the block number from the FRAME System module.
             let current_block = <frame_system::Module<T>>::block_number();
@@ -94,10 +97,7 @@ pub mod pallet {
         }
 
         #[pallet::weight(10_000)]
-        fn revoke_claim(
-            origin: OriginFor<T>,
-            proof: Vec<u8>,
-        ) -> DispatchResultWithPostInfo {
+        fn revoke_claim(origin: OriginFor<T>, proof: Vec<u8>) -> DispatchResultWithPostInfo {
             // Check that the extrinsic was signed and get the signer.
             // This function will return an error if the extrinsic is not signed.
             // https://substrate.dev/docs/en/knowledgebase/runtime/origin
