@@ -1,5 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
+use bs58::{Alphabet, decode};
 use libp2p_kad::record::Key;
 use sc_client_api::{blockchain::HeaderBackend, ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
@@ -9,6 +10,7 @@ use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sp_core::Decode;
 use sp_inherents::{InherentDataProviders, ProvideInherentData};
+use sp_std::str;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -239,6 +241,18 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
     }
 
     config.network.enable_dht_random_walk = true;
+
+    let node_peer_id = network.local_peer_id().to_string();
+
+    // Reference: https://substrate.dev/docs/en/knowledgebase/advanced/ss58-address-format
+    let decoded_peer_id = decode(node_peer_id)
+        .with_alphabet(Alphabet::BITCOIN)
+        .into_vec()
+        .unwrap();
+
+    let peer_id_hex = hex::encode(decoded_peer_id);
+
+    info!("PeerID (hex): {:?}", peer_id_hex);
 
     // Current best block at initialization, to report to the RPC layer.
     let last_hash = client.info().finalized_hash;
