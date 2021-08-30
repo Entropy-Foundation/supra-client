@@ -18,6 +18,7 @@ mod benchmarking;
 pub mod pallet {
     use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*};
     use frame_system::pallet_prelude::*;
+    use sp_std::vec::Vec;
 
     /// Configure the pallet by specifying the parameters and types on which it depends.
     #[pallet::config]
@@ -33,10 +34,8 @@ pub mod pallet {
     // The pallet's runtime storage items.
     // https://substrate.dev/docs/en/knowledgebase/runtime/storage
     #[pallet::storage]
-    #[pallet::getter(fn something)]
-    // Learn more about declaring storage items:
-    // https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-    pub type Something<T> = StorageValue<_, u32>;
+    pub(super) type Proofs<T: Config> =
+        StorageMap<_, Blake2_128Concat, Vec<u8>, (T::AccountId, T::BlockNumber), ValueQuery>;
 
     // Pallets use events to inform users when important changes are made.
     // https://substrate.dev/docs/en/knowledgebase/runtime/events
@@ -44,18 +43,21 @@ pub mod pallet {
     #[pallet::metadata(T::AccountId = "AccountId")]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Event documentation should end with an array that provides descriptive names for event
-        /// parameters. [something, who]
-        SomethingStored(u32, T::AccountId),
+        /// Event emitted when a proof has been claimed. [who, claim]
+        ClaimCreated(T::AccountId, Vec<u8>),
+        /// Event emitted when a claim is revoked by the owner. [who, claim]
+        ClaimRevoked(T::AccountId, Vec<u8>),
     }
 
     // Errors inform users that something went wrong.
     #[pallet::error]
     pub enum Error<T> {
-        /// Error names should be descriptive.
-        NoneValue,
-        /// Errors should have helpful documentation associated with them.
-        StorageOverflow,
+        /// The proof has already been claimed.
+        ProofAlreadyClaimed,
+        /// The proof does not exist, so it cannot be revoked.
+        NoSuchProof,
+        /// The proof is claimed by another account, so caller can't revoke it.
+        NotProofOwner,
     }
 
     #[pallet::hooks]
@@ -66,41 +68,57 @@ pub mod pallet {
     // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /// An example dispatchable that takes a singles value as a parameter, writes the value to
-        /// storage and emits an event. This function must be dispatched by a signed extrinsic.
-        #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-        pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResultWithPostInfo {
+        #[pallet::weight(1_000)]
+        pub(super) fn create_claim(
+            origin: OriginFor<T>,
+            proof: Vec<u8>,
+        ) -> DispatchResultWithPostInfo {
             // Check that the extrinsic was signed and get the signer.
             // This function will return an error if the extrinsic is not signed.
             // https://substrate.dev/docs/en/knowledgebase/runtime/origin
-            let who = ensure_signed(origin)?;
+            let sender = ensure_signed(origin)?;
 
-            // Update storage.
-            <Something<T>>::put(something);
+            // Verify that the specified proof has not already been claimed.
+            ensure!(
+                !Proofs::<T>::contains_key(&proof),
+                Error::<T>::ProofAlreadyClaimed
+            );
 
-            // Emit an event.
-            Self::deposit_event(Event::SomethingStored(something, who));
-            // Return a successful DispatchResultWithPostInfo
+            // Get the block number from the FRAME System module.
+            let current_block = <frame_system::Module<T>>::block_number();
+
+            // Store the proof with the sender and block number.
+            Proofs::<T>::insert(&proof, (&sender, current_block));
+
+            // Emit an event that the claim was created.
+            Self::deposit_event(Event::ClaimCreated(sender, proof));
+
             Ok(().into())
         }
 
-        /// An example dispatchable that may throw a custom error.
-        #[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-        pub fn cause_error(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
-            let _who = ensure_signed(origin)?;
+        #[pallet::weight(10_000)]
+        fn revoke_claim(origin: OriginFor<T>, proof: Vec<u8>) -> DispatchResultWithPostInfo {
+            // Check that the extrinsic was signed and get the signer.
+            // This function will return an error if the extrinsic is not signed.
+            // https://substrate.dev/docs/en/knowledgebase/runtime/origin
+            let sender = ensure_signed(origin)?;
 
-            // Read a value from storage.
-            match <Something<T>>::get() {
-                // Return an error if the value has not been set.
-                None => Err(Error::<T>::NoneValue)?,
-                Some(old) => {
-                    // Increment the value read from storage; will error in the event of overflow.
-                    let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-                    // Update the value in storage with the incremented result.
-                    <Something<T>>::put(new);
-                    Ok(().into())
-                }
-            }
+            // Verify that the specified proof has been claimed.
+            ensure!(Proofs::<T>::contains_key(&proof), Error::<T>::NoSuchProof);
+
+            // Get owner of the claim.
+            let (owner, _) = Proofs::<T>::get(&proof);
+
+            // Verify that sender of the current call is the claim owner.
+            ensure!(sender == owner, Error::<T>::NotProofOwner);
+
+            // Remove claim from storage.
+            Proofs::<T>::remove(&proof);
+
+            // Emit an event that the claim was erased.
+            Self::deposit_event(Event::ClaimRevoked(sender, proof));
+
+            Ok(().into())
         }
     }
 }

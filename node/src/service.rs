@@ -1,8 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 use libp2p_kad::record::Key;
-use supra_runtime::debug::info;
-use supra_runtime::{self, opaque::Block, RuntimeApi};
 use sc_client_api::{blockchain::HeaderBackend, ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
 use sc_finality_grandpa::SharedVoterState;
@@ -14,6 +12,8 @@ use sp_inherents::{InherentDataProviders, ProvideInherentData};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use supra_runtime::debug::info;
+use supra_runtime::{self, opaque::Block, RuntimeApi};
 
 pub use sc_executor::NativeExecutor;
 

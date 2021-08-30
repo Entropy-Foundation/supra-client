@@ -13,11 +13,12 @@
 .envrc
 docker-compose.yml
 LICENSE
-README.md
+*.md
 shell.nix
 **/docs
 **/scripts
 
 # Local build artifacts
 **/target
+node-key
 
