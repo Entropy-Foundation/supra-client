@@ -16,7 +16,10 @@ RUN cargo chef prepare --recipe-path recipe.json \
 # Since dependencies do not change often, docker build does not need to download them everytime
 FROM rust:1.54.0-buster as cacher
 WORKDIR /app
-RUN curl https://getsubstrate.io -sSf | bash -s \
+RUN apt-get update -qq \
+    && apt-get install -y -qq cmake libssl-dev clang libclang-dev \
+    && rustup update stable && rustup update nightly \
+    && rustup target add wasm32-unknown-unknown --toolchain nightly \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/
 COPY --from=planner /app/recipe.json .
@@ -28,7 +31,11 @@ RUN cargo chef cook --release --recipe-path recipe.json \
 # Uses dependencies cached from the earlier stage to build the project
 FROM rust:1.54.0-buster as builder
 WORKDIR /app
-RUN curl https://getsubstrate.io -sSf | bash -s \
+RUN apt-get update -qq \
+    && apt-get install -y -qq cmake libssl-dev clang libclang-dev \
+    && rustup update stable && rustup update nightly \
+    && rustup target add wasm32-unknown-unknown --toolchain nightly \
+    && cargo install --force --git https://github.com/paritytech/substrate subkey \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 COPY --from=cacher $CARGO_HOME $CARGO_HOME
 COPY --from=cacher /app/target target
