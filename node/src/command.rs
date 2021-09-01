@@ -23,7 +23,7 @@ use supra_runtime::Block;
 
 impl SubstrateCli for Cli {
     fn impl_name() -> String {
-        "Substrate Node".into()
+        "Supra Node".into()
     }
 
     fn impl_version() -> String {
@@ -43,7 +43,7 @@ impl SubstrateCli for Cli {
     }
 
     fn copyright_start_year() -> i32 {
-        2017
+        2021
     }
 
     fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
@@ -144,8 +144,13 @@ pub fn run() -> sc_cli::Result<()> {
                     .into())
             }
         }
+        Some(Subcommand::SupraCli(peer_id)) => {
+            peer_id.convert_to_hex()
+        }
         None => {
-            let runner = cli.create_runner(&cli.run)?;
+            let peer_id_hex = &cli.run.supra;
+            let sr_public_key = cli.run.sr25519_pub_key.unwrap();
+            let runner = cli.create_runner(&cli.run.base)?;
             runner.run_node_until_exit(|config| async move {
                 match config.role {
                     Role::Light => service::new_light(config),

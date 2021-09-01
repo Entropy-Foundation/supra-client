@@ -65,6 +65,7 @@ substrate-frame-rpc-system = '3.0.0'
 
 # local dependencies
 supra-runtime = { path = '../runtime'}
+supra-cli = { path = '../supra-cli', default-features = false}
 
 [features]
 default = []

@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use bs58::{Alphabet, decode};
+use bs58::{decode, Alphabet};
 use libp2p_kad::record::Key;
 use sc_client_api::{blockchain::HeaderBackend, ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
