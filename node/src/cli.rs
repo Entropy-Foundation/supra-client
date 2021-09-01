@@ -1,7 +1,4 @@
-use std::convert::TryInto;
-
 use structopt::StructOpt;
-use supra_cli::PeerIdHex;
 
 #[derive(Debug, StructOpt)]
 pub struct Cli {
@@ -9,30 +6,7 @@ pub struct Cli {
     pub subcommand: Option<Subcommand>,
 
     #[structopt(flatten)]
-    pub run: RunCmd,
-}
-
-#[derive(Debug, StructOpt)]
-pub struct RunCmd {
-    #[structopt(flatten)]
-    pub base: sc_cli::RunCmd,
-
-    /// Provides Hex version of PeerId as base58.
-    #[structopt(name = "supra", about = "Converting Peer Id to Hex")]
-    pub supra: PeerIdHex,
-
-    /// sr25519 public key
-    #[structopt(long, parse(try_from_str = parse_public_key))]
-    pub sr25519_pub_key: Option<sp_core::sr25519::Public>,
-
-}
-
-fn parse_public_key(i: &str) -> Result<sp_core::sr25519::Public, String> {
-    hex::decode(i)
-        .map_err(|e| e.to_string())?
-        .as_slice()
-        .try_into()
-        .or(Err("Invalid lenght".to_string()))
+    pub run: sc_cli::RunCmd,
 }
 
 #[derive(Debug, StructOpt)]
@@ -66,6 +40,6 @@ pub enum Subcommand {
     Benchmark(frame_benchmarking_cli::BenchmarkCmd),
 
     /// Supra CLI
-    #[structopt(flatten)]
-    SupraCli(supra_cli::PeerIdHex)
+    #[structopt(name = "peer-id-hex", about = "Provides Hex version of base58 PeerId.")]
+    PeerIdHex(supra_cli::PeerIdHexCmd)
 }

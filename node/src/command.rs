@@ -144,13 +144,12 @@ pub fn run() -> sc_cli::Result<()> {
                     .into())
             }
         }
-        Some(Subcommand::SupraCli(peer_id)) => {
+        Some(Subcommand::PeerIdHex(peer_id)) => {
+            // println!("Converting Peer ID in base58 to hex");
             peer_id.convert_to_hex()
         }
         None => {
-            let peer_id_hex = &cli.run.supra;
-            let sr_public_key = cli.run.sr25519_pub_key.unwrap();
-            let runner = cli.create_runner(&cli.run.base)?;
+            let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {
                 match config.role {
                     Role::Light => service::new_light(config),
