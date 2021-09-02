@@ -1,5 +1,6 @@
-use sc_cli::RunCmd;
 use structopt::StructOpt;
+
+use crate::supra_subcommands;
 
 #[derive(Debug, StructOpt)]
 pub struct Cli {
@@ -7,13 +8,14 @@ pub struct Cli {
     pub subcommand: Option<Subcommand>,
 
     #[structopt(flatten)]
-    pub run: RunCmd,
+    pub run: sc_cli::RunCmd,
 }
 
 #[derive(Debug, StructOpt)]
 pub enum Subcommand {
     /// Key management cli utilities
     Key(sc_cli::KeySubcommand),
+
     /// Build a chain specification.
     BuildSpec(sc_cli::BuildSpecCmd),
 
@@ -38,4 +40,8 @@ pub enum Subcommand {
     /// The custom benchmark subcommmand benchmarking runtime pallets.
     #[structopt(name = "benchmark", about = "Benchmark runtime pallets.")]
     Benchmark(frame_benchmarking_cli::BenchmarkCmd),
+
+    /// Decodes a base58 PeerID and returns its hex and bytes forms
+    #[structopt(name = "decode-peer-id", about = "Provides Hex version of base58 PeerId.")]
+    PeerIdHex(supra_subcommands::PeerIdHexCmd)
 }

@@ -9,6 +9,7 @@ use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sp_core::Decode;
 use sp_inherents::{InherentDataProviders, ProvideInherentData};
+use sp_std::str;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -183,7 +184,6 @@ impl DataMap {
 #[derive(Debug, Clone)]
 struct DhtLocalStorage {
     path: PathBuf,
-    // password: String
 }
 
 /// Builds a new service for a full client.
