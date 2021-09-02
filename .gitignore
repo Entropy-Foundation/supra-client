@@ -15,8 +15,6 @@
 # direnv cache
 .direnv
 
-Cargo.lock
-
 node-key
 
 .idea/runConfigurations.xml
