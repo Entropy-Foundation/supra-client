@@ -40,6 +40,6 @@ pub enum Subcommand {
     Benchmark(frame_benchmarking_cli::BenchmarkCmd),
 
     /// Supra CLI
-    #[structopt(name = "peer-id-hex", about = "Provides Hex version of base58 PeerId.")]
+    #[structopt(name = "decode-peer-id", about = "Provides Hex version of base58 PeerId.")]
     PeerIdHex(supra_cli::PeerIdHexCmd)
 }
