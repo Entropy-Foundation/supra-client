@@ -2,7 +2,7 @@
 
 # Planner-stage:
 # Generates `recipe.json` using `cargo chef`
-FROM rust:1.54.0-buster as planner
+FROM rust:1.54.0-slim-buster as planner
 WORKDIR /app
 RUN cargo install cargo-chef
 COPY . .
@@ -14,7 +14,7 @@ RUN cargo chef prepare --recipe-path recipe.json \
 # Cacher-stage:
 # Caches all rust cargo dependencies
 # Since dependencies do not change often, docker build does not need to download them everytime
-FROM rust:1.54.0-buster as cacher
+FROM rust:1.54.0-slim-buster as cacher
 WORKDIR /app
 RUN apt-get update -qq \
     && apt-get install -y -qq cmake libssl-dev clang libclang-dev \
@@ -29,7 +29,7 @@ RUN cargo chef cook --release --recipe-path recipe.json \
 
 # Builder-Stage:
 # Uses dependencies cached from the earlier stage to build the project
-FROM rust:1.54.0-buster as builder
+FROM rust:1.54.0-slim-buster as builder
 WORKDIR /app
 RUN apt-get update -qq \
     && apt-get install -y -qq cmake libssl-dev clang libclang-dev \
