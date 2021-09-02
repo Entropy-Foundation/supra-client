@@ -1,6 +1,6 @@
 use structopt::StructOpt;
 
-use crate::decode_peer_id;
+use crate::supra_subcommands;
 
 #[derive(Debug, StructOpt)]
 pub struct Cli {
@@ -43,5 +43,5 @@ pub enum Subcommand {
 
     /// Decodes a base58 PeerID and returns its hex and bytes forms
     #[structopt(name = "decode-peer-id", about = "Provides Hex version of base58 PeerId.")]
-    PeerIdHex(decode_peer_id::PeerIdHexCmd)
+    PeerIdHex(supra_subcommands::PeerIdHexCmd)
 }
