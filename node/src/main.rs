@@ -7,6 +7,7 @@ mod service;
 mod cli;
 mod command;
 mod rpc;
+mod decode_peer_id;
 
 fn main() -> sc_cli::Result<()> {
     command::run()

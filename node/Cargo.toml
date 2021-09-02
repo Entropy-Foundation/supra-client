@@ -23,6 +23,7 @@ async-std = { version = "1.9.0", features = ["attributes"] }
 bs58 = "0.4.0"
 futures = "0.3.15"
 futures-util = "0.3.15"
+hex = "0.4.3"
 jsonrpc-core = '15.1.0'
 structopt = '0.3.8'
 serde = "1.0.126"
@@ -64,7 +65,6 @@ substrate-frame-rpc-system = '3.0.0'
 
 # local dependencies
 supra-runtime = { path = '../runtime'}
-supra-cli = { path = '../supra-cli', default-features = false}
 
 [features]
 default = []
