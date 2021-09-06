@@ -146,7 +146,6 @@ pub fn run() -> sc_cli::Result<()> {
             }
         }
         Some(Subcommand::PeerIdHex(peer_id)) => {
-            // println!("Converting Peer ID in base58 to hex");
             peer_id.convert_to_hex()
         }
         None => {

@@ -1,5 +1,7 @@
 use structopt::StructOpt;
 
+use crate::supra_subcommands;
+
 #[derive(Debug, StructOpt)]
 pub struct Cli {
     #[structopt(subcommand)]
@@ -39,7 +41,7 @@ pub enum Subcommand {
     #[structopt(name = "benchmark", about = "Benchmark runtime pallets.")]
     Benchmark(frame_benchmarking_cli::BenchmarkCmd),
 
-    /// Supra CLI
-    #[structopt(name = "peer-id-hex", about = "Provides Hex version of base58 PeerId.")]
-    PeerIdHex(supra_cli::PeerIdHexCmd)
+    /// Decodes a base58 PeerID and returns its hex and bytes forms
+    #[structopt(name = "decode-peer-id", about = "Provides Hex version of base58 PeerId.")]
+    PeerIdHex(supra_subcommands::PeerIdHexCmd)
 }
