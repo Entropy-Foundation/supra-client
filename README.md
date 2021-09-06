@@ -1,20 +1,10 @@
-# Supra 
-
-### Using Nix
-
-Install [nix](https://nixos.org/) and optionally [direnv](https://github.com/direnv/direnv) and [lorri](https://github.com/target/lorri) for a fully plug
-and play experience for setting up the development environment. To get all the correct dependencies activate direnv `direnv allow` and lorri `lorri shell`.
+# Supra
 
 ### Rust Setup
 
 First, complete the [basic Rust setup instructions](./docs/rust-setup.md).
 
 ### Run
-Note: Some libraries only work with Rust nightly. Kindly build with rust nightly as default
-
-```sh
-rustup default nightly
-```
 
 To build and launch, run bash script
 
@@ -86,11 +76,6 @@ Due to recent Substrate upgrade, paste the following custom types JSON in **Sett
   "AccountInfo": "AccountInfoWithDualRefCount"
 }
 ```
-
-### Multi-Node Local Testnet
-
-If you want to see the multi-node consensus algorithm in action, refer to
-[our Start a Private Network tutorial](https://substrate.dev/docs/en/tutorials/start-a-private-network/).
 
 ## DHT Peer Behaviour
 
@@ -187,28 +172,7 @@ A FRAME pallet is compromised of a number of blockchain primitives:
 -   Config: The `Config` configuration interface is used to define the types and parameters upon
     which a FRAME pallet depends.
 
-### Run in Docker
+### Using Nix
 
-First, install [Docker](https://docs.docker.com/get-docker/) and
-[Docker Compose](https://docs.docker.com/compose/install/).
-
-Then run the following command to start a single node development chain.
-
-```bash
-./scripts/docker_run.sh
-```
-
-This command will firstly compile your code, and then start a local development network. You can
-also replace the default command (`cargo build --release && ./target/release/supra --dev --ws-external`)
-by appending your own. A few useful ones are as follow.
-
-```bash
-# Run Substrate node without re-compiling
-./scripts/docker_run.sh ./target/release/supra --dev --ws-external
-
-# Purge the local dev chain
-./scripts/docker_run.sh ./target/release/supra purge-chain --dev
-
-# Check whether the code is compilable
-./scripts/docker_run.sh cargo check
-```
+Install [nix](https://nixos.org/) and optionally [direnv](https://github.com/direnv/direnv) and [lorri](https://github.com/target/lorri) for a fully plug
+and play experience for setting up the development environment. To get all the correct dependencies activate direnv `direnv allow` and lorri `lorri shell`.
