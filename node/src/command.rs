@@ -148,6 +148,9 @@ pub fn run() -> sc_cli::Result<()> {
         Some(Subcommand::PeerIdHex(peer_id)) => {
             peer_id.convert_to_hex()
         }
+        Some(Subcommand::GeneratePeerId(node_key)) => {
+            node_key.gen_peer_id()
+        }
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {
@@ -160,3 +163,5 @@ pub fn run() -> sc_cli::Result<()> {
         }
     }
 }
+
+

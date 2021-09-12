@@ -43,5 +43,9 @@ pub enum Subcommand {
 
     /// Decodes a base58 PeerID and returns its hex and bytes forms
     #[structopt(name = "decode-peer-id", about = "Provides Hex version of base58 PeerId.")]
-    PeerIdHex(supra_subcommands::PeerIdHexCmd)
+    PeerIdHex(supra_subcommands::PeerIdHexCmd),
+
+    /// Decodes a base58 PeerID and returns its hex and bytes forms
+    #[structopt(name = "get-peerid", about = "Generates PeerID from Public Key.")]
+    GeneratePeerId(supra_subcommands::GeneratePeerIdCmd)
 }
