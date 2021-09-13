@@ -144,8 +144,8 @@ pub fn run() -> sc_cli::Result<()> {
                     .into())
             }
         }
-        Some(Subcommand::SecretKeyVec(secret_key)) => {
-            secret_key.convert_to_peer_vec()
+        Some(Subcommand::PeerIdHex(peer_id)) => {
+            peer_id.convert_to_hex()
         }
         None => {
             let runner = cli.create_runner(&cli.run)?;
