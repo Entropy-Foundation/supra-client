@@ -1,73 +1,92 @@
 #!/usr/bin/env sh
 
-# Hardcoded well-known accounts' keys
-ALICE_AURA="5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
-BOB_AURA="5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
-ALICE_GRANDPA="5FA9nQDVg267DEd8m1ZypXLBnvN7SFxYwV7ndqSYGiN9TTpu"
-BOB_GRANDPA="5GoNkf6WdbxCFnPdAnYYQyCjAKPJgLNxXwPjwTh6DGg6gN3E"
-
 # Output files
-NODE1_AURA_FILE="node1.key"
-NODE2_AURA_FILE="node2.key"
+NODE1_KEY_FILE="node1.key"
+NODE2_KEY_FILE="node2.key"
 
 main()  {
   # TODO:
   # Check if `local` works inside our docker containers
   local supra
+  local pass_phrase
+  local node1_key
+  local node2_key
+  local gran_key
+  local peer_id_vec
+
   supra=$1
 
   # Generate the default chainSpec.json
-  ${supra} build-spec --disable-default-bootnode --chain local > chainSpec.json
+  ${supra} build-spec --disable-default-bootnode --chain local > chainSpec.json 2> /dev/null && echo "Generated Chain Spec"
 
-  # Generate Public-Private and AURA keys
-  subkey generate --scheme sr25519 > ${NODE1_AURA_FILE}
-  insert_node_keys ${NODE1_AURA_FILE} "ALICE"
-  subkey generate --scheme sr25519 > ${NODE2_AURA_FILE}
-  insert_node_keys ${NODE2_AURA_FILE} "BOB"
+  # Node1 - AURA and GRANDPA keys
+  subkey generate --scheme sr25519 > ${NODE1_KEY_FILE}
+  pass_phrase="$(get_mnemonics ${NODE1_KEY_FILE})"
+  subkey inspect --scheme ed25519 "${pass_phrase}" > "${NODE1_KEY_FILE%.*}_grandpa.key"
+
+  # Node1 - Parse out the Aura & Grandpa Public Keys
+  node1_key="$(get_public_key ${NODE1_KEY_FILE})"
+  gran_key="$(get_public_key ${NODE1_KEY_FILE%.*}_grandpa.key)"
+
+  # Node1 - Add Aura & Grandpa Keys to chainSpec
+  sed -i '/"palletAura"/!b;n;n;c"'"$node1_key"'",' chainSpec.json
+  sed -i '/"palletGrandpa"/!b;n;n;n;c"'"$gran_key"'",' chainSpec.json
+
+  # Node2 - AURA and GRANDPA keys
+  subkey generate --scheme sr25519 > ${NODE2_KEY_FILE}
+  pass_phrase="$(get_mnemonics ${NODE2_KEY_FILE})"
+  subkey inspect --scheme ed25519 "${pass_phrase}" > "${NODE2_KEY_FILE%.*}_grandpa.key"
+
+  # Node2 - Parse out the Aura & Grandpa Public Keys
+  node2_key=$(get_public_key "${NODE2_KEY_FILE}")
+  gran_key=$(get_public_key "${NODE2_KEY_FILE%.*}_grandpa.key")
+
+  # Node2 - Add Aura & Grandpa Keys to chainSpec
+  sed -i '/"palletAura"/!b;n;n;n;c"'"$node2_key"'"' chainSpec.json
+  sed -i '/"palletGrandpa"/!b;n;n;n;n;n;n;n;c"'"$gran_key"'",' chainSpec.json
 
   # TODO:
-  # Figure out how to get the peerid for both these nodes
-  # Get the hex array for both of these nodes - `supra decode-peed-id <peer-id>`
   # Insert the hex array to chainSpec.json
+  sed -i '/"supraAuthorization"/{!b;n;n;n;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;d}' chainSpec.json
+  sed -i '/"supraAuthorization"/{!b;n;n;n;n;n;n;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;d}' chainSpec.json
 
-  # Generate rawChainSpec.json - `node-template build-spec --chain=chainSpec.json --raw --disable-default-bootnode > rawChainSpec.json`
-  ${supra} build-spec --chain=chainSpec.json --raw --disable-default-bootnode > rawChainSpec.json
+  peer_id_vec=$(generate_decoded_peerid_file "${NODE1_KEY_FILE}")
+  sed -i '/"supraAuthorization"/!b;n;n;a'"$peer_id_vec"',' chainSpec.json
+  sed -i '/"supraAuthorization"/!b;n;n;n;n;c"'"$node1_key"'"' chainSpec.json
+
+  peer_id_vec=$(generate_decoded_peerid_file "${NODE2_KEY_FILE}")
+  sed -i '/"supraAuthorization"/!b;n;n;n;n;n;n;a'"$peer_id_vec"',' chainSpec.json
+  sed -i '/"supraAuthorization"/!b;n;n;n;n;n;n;n;n;c"'"$node2_key"'"' chainSpec.json
+
+  # Generate the rawChainSpec.json
+  ${supra} build-spec --chain=chainSpec.json --raw --disable-default-bootnode > rawChainSpec.json 2> /dev/null && echo "Generated Raw Chain Spec"
 }
 
-insert_node_keys() {
+get_public_key() {
   local key_file
-  local grandpa_key_file
-  local pass_phrase
-  local aura_key
-  local grandpa_key
-  local aura_search_key
-  local grandpa_search_key
+  key_file=$1
+  echo "$(tail -1 ${key_file} | awk -F ":" '{printf("%s", $2)}' | xargs)"
+}
 
-  key_file="$1"
-  replacing="$2"
+get_mnemonics() {
+  local key_file
+  key_file=$1
+  echo "$(head -1 ${key_file} | awk -F ':' 'NF {printf ("%s", $2)}' | xargs)"
+}
 
-  if [ "$replacing" = "ALICE" ]; then
-    aura_search_key=${ALICE_AURA}
-    grandpa_search_key=${ALICE_GRANDPA}
-  else
-    aura_search_key=${BOB_AURA}
-    grandpa_search_key=${BOB_GRANDPA}
-  fi
+generate_decoded_peerid_file() {
+  local key_file
+  local node_key
 
-  # Insert AURA key to chainSpec.json
-  aura_key="$(tail -1 ${key_file} | awk -F ":" '{printf("%s", $2)}' | xargs)"
-  sed -i "s/${aura_search_key}/${aura_key}/g" chainSpec.json
+  key_file=$1
 
-  # Parse passphrase from the key_file
-  pass_phrase="$(head -1 ${key_file} | awk -F ':' 'NF {printf ("%s", $2)}' | xargs)"
+  # Public key (hex) from `subkey generate --scheme sr25519` = node_key
+  node_key="$(sed -n 3p ${key_file} | awk -F ":" '{printf("%s", $2)}' | xargs)"
 
-  # Generate GRANDPA key
-  grandpa_key_file="${key_file%.*}_grandpa.key"
-  subkey inspect --scheme ed25519 "${pass_phrase}" > "${grandpa_key_file}"
+  # Decode the Node-Key to get PeerID
+  ${supra} decode-public-key ${node_key##0x} > "${key_file%.*}"_decoded.key
 
-  # Insert GRANPA Key to chainSpec.json
-  grandpa_key="$(tail -1 ${grandpa_key_file} | awk -F ":" '{printf("%s", $2)}' | xargs)"
-  sed -i "s/${grandpa_search_key}/${grandpa_key}/g" chainSpec.json
+  echo "$(tail -1 "${key_file%.*}"_decoded.key | awk -F ':' 'NF {printf ("%s", $2)}' | xargs)"
 }
 
 main "$@"
