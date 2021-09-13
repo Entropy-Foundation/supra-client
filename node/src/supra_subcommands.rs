@@ -10,7 +10,7 @@ pub struct DecodePublicKeyCmd {
 }
 
 impl DecodePublicKeyCmd {
-    pub fn convert_to_peer_vec(&self) -> Result<(), sc_cli::Error> {
+    pub fn get_peerid(&self) -> Result<(), sc_cli::Error> {
         let bytes = hex::decode(&self.public_key).unwrap();
         let secret = ed25519::SecretKey::from_bytes(bytes).unwrap();
         let keypair = ed25519::Keypair::from(secret);

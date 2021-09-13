@@ -144,7 +144,7 @@ pub fn run() -> sc_cli::Result<()> {
                     .into())
             }
         }
-        Some(Subcommand::PeerID(secret_key)) => secret_key.convert_to_peer_vec(),
+        Some(Subcommand::PeerID(secret_key)) => secret_key.get_peerid(),
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {
