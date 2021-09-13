@@ -30,6 +30,7 @@ serde = "1.0.126"
 
 # Libp2p dependencies
 libp2p-kad = "0.28.1"
+libp2p-core = "0.29.0"
 
 # Substrate dependencies
 frame-benchmarking = '3.1.0'
