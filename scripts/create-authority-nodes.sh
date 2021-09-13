@@ -45,8 +45,8 @@ main()  {
   sed -i '/"palletAura"/!b;n;n;n;c"'"$node2_key"'"' chainSpec.json
   sed -i '/"palletGrandpa"/!b;n;n;n;n;n;n;n;c"'"$gran_key"'",' chainSpec.json
 
-  # TODO:
-  # Insert the hex array to chainSpec.json
+  # TODO
+  #   - Find an elegant, non-fragile way to do this
   sed -i '/"supraAuthorization"/{!b;n;n;n;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;d}' chainSpec.json
   sed -i '/"supraAuthorization"/{!b;n;n;n;n;n;n;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;N;d}' chainSpec.json
 
@@ -60,6 +60,12 @@ main()  {
 
   # Generate the rawChainSpec.json
   ${supra} build-spec --chain=chainSpec.json --raw --disable-default-bootnode > rawChainSpec.json 2> /dev/null && echo "Generated Raw Chain Spec"
+
+
+  # TODO
+  #   - Start the bootnode
+  #   - Add keys to the bootnode using CURL
+  #   - Start the 2nd node using the configurations of the bootnode
 }
 
 get_public_key() {
