@@ -17,13 +17,13 @@
 
 use crate::cli::{Cli, Subcommand};
 use crate::{chain_spec, service};
-use node_template_runtime::Block;
 use sc_cli::{ChainSpec, Role, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
+use supra_runtime::Block;
 
 impl SubstrateCli for Cli {
     fn impl_name() -> String {
-        "Substrate Node".into()
+        "Supra Node".into()
     }
 
     fn impl_version() -> String {
@@ -43,15 +43,13 @@ impl SubstrateCli for Cli {
     }
 
     fn copyright_start_year() -> i32 {
-        2017
+        2021
     }
 
     fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
-        println!("devname =============={}", id.to_string());
         Ok(match id {
-            // "dev" => Box::new(chain_spec::development_config()?),
+            "dev" => Box::new(chain_spec::development_config()?),
             "" | "local" => Box::new(chain_spec::local_testnet_config()?),
-            "my_spec" => Box::new(chain_spec::custom_testnet_config(id.to_string())?),
             path => Box::new(chain_spec::ChainSpec::from_json_file(
                 std::path::PathBuf::from(path),
             )?),
@@ -59,7 +57,7 @@ impl SubstrateCli for Cli {
     }
 
     fn native_runtime_version(_: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-        &node_template_runtime::VERSION
+        &supra_runtime::VERSION
     }
 }
 
@@ -145,6 +143,9 @@ pub fn run() -> sc_cli::Result<()> {
 				You can enable it with `--features runtime-benchmarks`."
                     .into())
             }
+        }
+        Some(Subcommand::PeerIdHex(peer_id)) => {
+            peer_id.convert_to_hex()
         }
         None => {
             let runner = cli.create_runner(&cli.run)?;

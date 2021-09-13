@@ -1,12 +1,12 @@
-use node_template_runtime::{
-    AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig,
-    SystemConfig, WASM_BINARY,
-};
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_core::{sr25519, Pair, Public};
+use sp_core::{sr25519, OpaquePeerId, Pair, Public};
 use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{IdentifyAccount, Verify};
+use supra_runtime::{
+    AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig,
+    SupraAuthorizationConfig, SystemConfig, WASM_BINARY,
+};
 
 // The URL for the telemetry server.
 // const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
@@ -35,7 +35,7 @@ where
 pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
     (get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
 }
-/*
+
 pub fn development_config() -> Result<ChainSpec, String> {
     let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
 
@@ -73,7 +73,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         // Extensions
         None,
     ))
-}*/
+}
 
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
     let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
@@ -160,56 +160,25 @@ fn testnet_genesis(
             // Assign network admin rights.
             key: root_key,
         }),
+        supra_authorization: Some(SupraAuthorizationConfig {
+            nodes: vec![
+                (
+                    OpaquePeerId(
+                        bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2")
+                            .into_vec()
+                            .unwrap(),
+                    ),
+                    endowed_accounts[0].clone(),
+                ),
+                (
+                    OpaquePeerId(
+                        bs58::decode("12D3KooWQYV9dGMFoRzNStwpXztXaBUjtPqi6aU76ZgUriHhKust")
+                            .into_vec()
+                            .unwrap(),
+                    ),
+                    endowed_accounts[1].clone(),
+                ),
+            ],
+        }),
     }
-}
-
-pub fn custom_testnet_config(name:String) -> Result<ChainSpec, String> {
-    let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
-    // let name_str =name.as_str();
-
-    Ok(ChainSpec::from_genesis(
-        // Name
-        "Custom Testnet",
-        // ID
-        "custom_testnet",
-        ChainType::Local,
-        move || {
-            testnet_genesis(
-                wasm_binary,
-                // Initial PoA authorities
-                vec![
-                    authority_keys_from_seed(name.as_str()),
-                    // authority_keys_from_seed("Bob"),
-                ],
-                // Sudo account
-                get_account_id_from_seed::<sr25519::Public>(name.as_str()),
-                // Pre-funded accounts
-                vec![
-                    get_account_id_from_seed::<sr25519::Public>(name.as_str()),
-                    // get_account_id_from_seed::<sr25519::Public>("Bob"),
-                    // get_account_id_from_seed::<sr25519::Public>("Charlie"),
-                    // get_account_id_from_seed::<sr25519::Public>("Dave"),
-                    // get_account_id_from_seed::<sr25519::Public>("Eve"),
-                    // get_account_id_from_seed::<sr25519::Public>("Ferdie"),
-                    // get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
-                    // get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-                    // get_account_id_from_seed::<sr25519::Public>("Charlie//stash"),
-                    // get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
-                    // get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
-                    // get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-                ],
-                true,
-            )
-        },
-        // Bootnodes
-        vec![],
-        // Telemetry
-        None,
-        // Protocol ID
-        None,
-        // Properties
-        None,
-        // Extensions
-        None,
-    ))
 }

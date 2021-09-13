@@ -5,30 +5,30 @@ description = 'A fresh FRAME-based Substrate node, ready for hacking.'
 edition = '2018'
 homepage = 'https://substrate.dev'
 license = 'Unlicense'
-name = 'node-template'
+name = 'supra'
 repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
 version = '3.0.0'
 
 [[bin]]
-name = 'node-template'
+name = 'supra'
 
 [package.metadata.docs.rs]
-targets = ['x86_64-unknown-linux-gnu']
+targets = ["x86_64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "aarch64-apple-darwin"]
 
 [build-dependencies]
 substrate-build-script-utils = '3.0.0'
 
 [dependencies]
 async-std = { version = "1.9.0", features = ["attributes"] }
+bs58 = "0.4.0"
 futures = "0.3.15"
 futures-util = "0.3.15"
+hex = "0.4.3"
 jsonrpc-core = '15.1.0'
 structopt = '0.3.8'
 serde = "1.0.126"
 
 # Libp2p dependencies
-libp2p-core = "0.28.3"
-libp2p = "0.34.0"
 libp2p-kad = "0.28.1"
 
 # Substrate dependencies
@@ -59,13 +59,14 @@ sp-core = '3.0.0'
 sp-finality-grandpa = '3.0.0'
 sp-inherents = '3.0.0'
 sp-runtime = '3.0.0'
+sp-std = { version = '3.0', default-features = false }
 sp-transaction-pool = '3.0.0'
 substrate-frame-rpc-system = '3.0.0'
 
 # local dependencies
-node-template-runtime = { path = '../runtime', version = '3.0.0' }
+supra-runtime = { path = '../runtime'}
 
 [features]
 default = []
-runtime-benchmarks = ['node-template-runtime/runtime-benchmarks']
+runtime-benchmarks = ['supra-runtime/runtime-benchmarks']
 light-client = []
