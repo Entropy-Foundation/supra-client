@@ -88,11 +88,17 @@ pub fn supra_config() -> Result<ChainSpec, String> {
             testnet_genesis(
                 wasm_binary,
                 // Initial PoA authorities
-                vec![],
+                vec![
+                    authority_keys_from_seed("0xc8c157749a3f500000e6e5b92de459b4a609e50ece5c036abbf43006ced4d111"),
+                ],
                 // Sudo account
-                get_account_id_from_seed::<sr25519::Public>("Supra"),
+                get_account_id_from_seed::<sr25519::Public>("0xc8c157749a3f500000e6e5b92de459b4a609e50ece5c036abbf43006ced4d111"),
                 // Pre-funded accounts
-                vec![],
+                vec![
+                    get_account_id_from_seed::<sr25519::Public>("0xc8c157749a3f500000e6e5b92de459b4a609e50ece5c036abbf43006ced4d111"),
+                    get_account_id_from_seed::<sr25519::Public>("Alice"),
+                    get_account_id_from_seed::<sr25519::Public>("Bob"),
+                ],
                 true,
             )
         },
