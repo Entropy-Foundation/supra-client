@@ -42,10 +42,9 @@ pub enum Subcommand {
     Benchmark(frame_benchmarking_cli::BenchmarkCmd),
 
     /// Decodes a base58 PeerID and returns its hex and bytes forms
-    #[structopt(name = "decode-peer-id", about = "Provides Hex version of base58 PeerId.")]
-    PeerIdHex(supra_subcommands::PeerIdHexCmd),
-
-    /// Decodes a base58 PeerID and returns its hex and bytes forms
-    #[structopt(name = "get-peerid", about = "Generates PeerID from Public Key.")]
-    GeneratePeerId(supra_subcommands::GeneratePeerIdCmd)
+    #[structopt(
+    name = "decode-public-key",
+    about = "Decodes a Public Key to generate PeerID"
+    )]
+    PeerID(supra_subcommands::DecodePublicKeyCmd),
 }
