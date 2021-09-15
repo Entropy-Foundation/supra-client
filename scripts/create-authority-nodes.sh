@@ -83,8 +83,6 @@ main()  {
   add_to_keystore "aura" "${NODE2_KEY_FILE}" "$NODE2_RPC_PORT"
   add_to_keystore "gran" "${NODE2_KEY_FILE%.*}_grandpa.key" "$NODE2_RPC_PORT"
 
-  sleep 60 # Wait for block generations
-
   # Restart both the nodes
   kill "$(ps aux | grep "$node1_node_key" | awk '{print $2}' | head -1)" && echo "Node1 stopped"
   kill "$(ps aux | grep "$node2_node_key" | awk '{print $2}' | head -1)" && echo "Node2 stopped"
@@ -94,9 +92,9 @@ main()  {
 }
 
 generate_request_body(){
-  local key_type=$1
-  local pass_phrase=$2
-  local pub_key=$3
+  local key_type="$1"
+  local pass_phrase="$2"
+  local pub_key="$3"
 
   cat <<EOF
 {
@@ -105,8 +103,8 @@ generate_request_body(){
   "method":"author_insertKey",
   "params": [
     "$key_type",
-    "$(get_mnemonics ${NODE1_KEY_FILE})",
-    "$(get_public_key_hex ${NODE1_KEY_FILE})"
+    "$pass_phrase",
+    "$pub_key"
   ]
 }
 EOF
