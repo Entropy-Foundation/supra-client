@@ -2,14 +2,15 @@
 
 # shellcheck disable=SC2005
 
+NODE1_RPC_PORT=9933
+NODE2_RPC_PORT=9934
+NODE_COMMON_PARAMS="--no-prometheus --no-telemetry --rpc-methods Unsafe --rpc-cors all"
+
 # Output files
 NODE1_KEY_FILE="node1.key"
 NODE2_KEY_FILE="node2.key"
 CHAIN_SPEC_FILE="chainSpec.json"
 RAW_CHAIN_SPEC_FILE="rawChainSpec.json"
-NODE_COMMON_PARAMS="--no-prometheus --no-telemetry --rpc-methods Unsafe --rpc-cors all"
-NODE1_RPC_PORT=9933
-NODE2_RPC_PORT=9934
 
 main()  {
   # TODO:
@@ -24,71 +25,90 @@ main()  {
   local peer_id_vec
 
   # Generate the default chainSpec.json
-  ${supra} build-spec --disable-default-bootnode --chain local > "${CHAIN_SPEC_FILE}" 2> /dev/null && echo "Generated Chain Spec"
+  ${supra} build-spec --disable-default-bootnode --chain local > "${CHAIN_SPEC_FILE}" 2> /dev/null && echo "Generated ${CHAIN_SPEC_FILE}"
 
-  # Node1 - AURA and GRANDPA keys
-  subkey generate --scheme sr25519 > ${NODE1_KEY_FILE}
-  pass_phrase="$(get_mnemonics ${NODE1_KEY_FILE})"
-  subkey inspect --scheme ed25519 "${pass_phrase}" > "${NODE1_KEY_FILE%.*}_grandpa.key"
+  # Add node1 & node2 AURA & GRANDPA keys to chainSpec.json
+  add_aura_grandpa_keys_to_chainspec 2 3 "${NODE1_KEY_FILE}" && echo "Node1 - AURA/GRANDPA key added to ${CHAIN_SPEC_FILE}" || echo "Failed: Node1 - Adding AURA/GRANDPA keys to ${CHAIN_SPEC_FILE}"
+  add_aura_grandpa_keys_to_chainspec 3 7 "${NODE2_KEY_FILE}" && echo "Node2 - AURA/GRANDPA key added to ${CHAIN_SPEC_FILE}" || echo "Failed: Node2 - Adding AURA/GRANDPA keys to ${CHAIN_SPEC_FILE}"
 
-  # Node1 - Parse out the Aura & Grandpa Public Keys
+  # Remove palletBalances section
+#  sed -i '/palletBalances/,+51d' "${CHAIN_SPEC_FILE}" && echo "PalletBalances sections removed from ${CHAIN_SPEC_FILE}" || echo "Failed: removing PalletBalances ${CHAIN_SPEC_FILE}"
+#  search_skip_delete_insert "palletSudo" 1 1 '"key": "'$(get_public_key_ss58 ${NODE1_KEY_FILE})''"' "${CHAIN_SPEC_FILE}"
+
+  # Add node1 & node2 peer_id vectors to chainSpec.json
   node1_ss58_key="$(get_public_key_ss58 ${NODE1_KEY_FILE})"
-  gran_key="$(get_public_key_ss58 ${NODE1_KEY_FILE%.*}_grandpa.key)"
-
-  # Node1 - Add Aura & Grandpa Keys to chainSpec
-  search_skip_replace "palletAura" 2 '"'"$node1_ss58_key"'",' "${CHAIN_SPEC_FILE}"
-  search_skip_replace "palletGrandpa" 3 '"'"$gran_key"'",' "${CHAIN_SPEC_FILE}"
-
-  # Node2 - AURA and GRANDPA keys
-  subkey generate --scheme sr25519 > ${NODE2_KEY_FILE}
-  pass_phrase="$(get_mnemonics ${NODE2_KEY_FILE})"
-  subkey inspect --scheme ed25519 "${pass_phrase}" > "${NODE2_KEY_FILE%.*}_grandpa.key"
-
-  # Node2 - Parse out the Aura & Grandpa Public Keys
   node2_ss58_key=$(get_public_key_ss58 "${NODE2_KEY_FILE}")
-  gran_key=$(get_public_key_ss58 "${NODE2_KEY_FILE%.*}_grandpa.key")
-
-  # Node2 - Add Aura & Grandpa Keys to chainSpec
-  search_skip_replace "palletAura" 3 '"'"$node2_ss58_key"'"' "${CHAIN_SPEC_FILE}"
-  search_skip_replace "palletGrandpa" 7 '"'"$gran_key"'",' "${CHAIN_SPEC_FILE}"
-
-  # Remove palletBalances & palletSudo sections
-  sed -i '/palletBalances/,+54d' "${CHAIN_SPEC_FILE}"
-
-  # Node1 - Add peer_id vector & Public Key to chainSpec
-  peer_id_vec=$(generate_decoded_peer_id_file "${NODE1_KEY_FILE}")
-  search_skip_delete_insert "supraAuthorization" 3 40 "${peer_id_vec}," "${CHAIN_SPEC_FILE}"
-  search_skip_delete_insert "supraAuthorization" 4 1 "\"${node1_ss58_key}\"" "${CHAIN_SPEC_FILE}"
-
-  # Node2 - Add peer_id vector & Public Key to chainSpec
-  peer_id_vec=$(generate_decoded_peer_id_file "${NODE2_KEY_FILE}")
-  search_skip_delete_insert "supraAuthorization" 7 40 "${peer_id_vec}," "${CHAIN_SPEC_FILE}"
-  search_skip_delete_insert "supraAuthorization" 8 1 "\"${node2_ss58_key}\"" "${CHAIN_SPEC_FILE}"
+  add_peer_id_vec_to_chainspec 3 "${node1_ss58_key}" "${NODE1_KEY_FILE}" && echo "Node1 - Added PeerID to ${CHAIN_SPEC_FILE}" || echo "Failed: Node1 - Adding PeerID to ${CHAIN_SPEC_FILE}"
+  add_peer_id_vec_to_chainspec 7 "${node2_ss58_key}" "${NODE2_KEY_FILE}" && echo "Node2 - Added PeerID to ${CHAIN_SPEC_FILE}" || echo "Failed: Node2 - Adding PeerID to ${CHAIN_SPEC_FILE}"
 
   # Generate the rawChainSpec.json
-  ${supra} build-spec --chain="${CHAIN_SPEC_FILE}" --raw --disable-default-bootnode > "${RAW_CHAIN_SPEC_FILE}" 2> /dev/null && echo "Generated Raw Chain Spec"
+  ${supra} build-spec --chain="${CHAIN_SPEC_FILE}" --raw --disable-default-bootnode > "${RAW_CHAIN_SPEC_FILE}" 2> /dev/null && echo "Generated ${RAW_CHAIN_SPEC_FILE}"
 
   node1_node_key="$(get_node_key ${NODE1_KEY_FILE})"
   node2_node_key="$(get_node_key ${NODE2_KEY_FILE})"
 
   # Start node1 and node2
-  rm -rf /tmp/one && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
-  rm -rf /tmp/two && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
+  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
+  rm -rf /tmp/two && echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
 
-  sleep 10 # Wait till the nodes start
+  sleep 10 # Wait for the nodes to start
 
   # Add AURA & GRANDPA keys to the to node1 and node2's keystore
-  add_to_keystore "aura" "${NODE1_KEY_FILE}" "$NODE1_RPC_PORT"
-  add_to_keystore "gran" "${NODE1_KEY_FILE%.*}_grandpa.key" "$NODE1_RPC_PORT"
-  add_to_keystore "aura" "${NODE2_KEY_FILE}" "$NODE2_RPC_PORT"
-  add_to_keystore "gran" "${NODE2_KEY_FILE%.*}_grandpa.key" "$NODE2_RPC_PORT"
+  add_key_to_node_keystore "aura" "${NODE1_KEY_FILE}" "$NODE1_RPC_PORT" && echo "Node1 - Aura key added to keystore"  || echo "Failed: Node1 - Aura key to keystore"
+  add_key_to_node_keystore "gran" "${NODE1_KEY_FILE%.*}_grandpa.key" "$NODE1_RPC_PORT" && echo "Node1 - Grandpa key added to keystore"  || echo "Failed: Node1 - Grandpa key to keystore"
+  add_key_to_node_keystore "aura" "${NODE2_KEY_FILE}" "$NODE2_RPC_PORT" && echo "Node2 - Aura key added to keystore"  || echo "Failed: Node2 - Aura key to keystore"
+  add_key_to_node_keystore "gran" "${NODE2_KEY_FILE%.*}_grandpa.key" "$NODE2_RPC_PORT" && echo "Node2 - Grandpa key added to keystore"  || echo "Failed: Node2 - Grandpa key to keystore"
 
   # Restart both the nodes
   kill "$(ps aux | grep "$node1_node_key" | awk '{print $2}' | head -1)" && echo "Node1 stopped"
   kill "$(ps aux | grep "$node2_node_key" | awk '{print $2}' | head -1)" && echo "Node2 stopped"
-  ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
-  ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
+  echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
+  echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
+
   wait
+}
+
+add_aura_grandpa_keys_to_chainspec() {
+  local aura_key_insert_offset="$1"
+  local grandpa_key_insert_offset="$2"
+  local key_file="$3"
+
+  # Node1 - AURA and GRANDPA keys
+  subkey generate --scheme sr25519 > ${key_file}
+  local pass_phrase="$(get_mnemonics ${key_file})"
+  subkey inspect --scheme ed25519 "${pass_phrase}" > "${key_file%.*}_grandpa.key"
+
+  # Node1 - Parse out the Aura & Grandpa Public Keys
+  local node1_ss58_key="$(get_public_key_ss58 ${key_file})"
+  local gran_key="$(get_public_key_ss58 ${key_file%.*}_grandpa.key)"
+
+  # Ugly hack - but reduces code duplication
+  if [ "$key_file" = "$NODE1_KEY_FILE" ]; then
+    node1_ss58_key='"'"$node1_ss58_key"'",' # Adds a command at the end
+  else
+    node1_ss58_key='"'"$node1_ss58_key"'"' # Adds a command at the end
+  fi
+
+  gran_key='"'"$gran_key"'",'
+
+  # Node1 - Add Aura & Grandpa Keys to chainSpec
+  search_skip_replace "palletAura" "$aura_key_insert_offset" "$node1_ss58_key" "${CHAIN_SPEC_FILE}"
+  search_skip_replace "palletGrandpa" "$grandpa_key_insert_offset" "$gran_key" "${CHAIN_SPEC_FILE}"
+}
+
+add_peer_id_vec_to_chainspec() {
+  local peer_id_vec_offset="$1"
+  local ss58_key="$2"
+  local key_file="$3"
+
+  local ss588_key_offset=$(( peer_id_vec_offset + 1 ))
+
+  local peer_id_vec
+  generate_peer_id_vec "${key_file}"
+  peer_id_vec=$(get_peer_id_vector "${key_file}")
+
+  search_skip_delete_insert "supraAuthorization" "$peer_id_vec_offset" 40 "${peer_id_vec}," "${CHAIN_SPEC_FILE}"
+  search_skip_delete_insert "supraAuthorization" "$ss588_key_offset" 1 "\"${ss58_key}\"" "${CHAIN_SPEC_FILE}"
 }
 
 generate_request_body(){
@@ -110,7 +130,7 @@ generate_request_body(){
 EOF
 }
 
-add_to_keystore() {
+add_key_to_node_keystore() {
   local key_type=$1
   local key_file=$2
   local port=$3
@@ -139,7 +159,11 @@ get_mnemonics() {
   echo "$(head -1 $1 | cut -f2 -d : | xargs)"
 }
 
-generate_decoded_peer_id_file() {
+get_peer_id_vector(){
+  echo "$(tail -1 "${1%.*}"_decoded.key | cut -f2 -d : | xargs)"
+}
+
+generate_peer_id_vec() {
   local key_file=$1
 
   # Public key (hex) from `subkey generate --scheme sr25519` = node_key
@@ -147,8 +171,6 @@ generate_decoded_peer_id_file() {
 
   # Decode the Node-Key to get PeerID
   ${supra} decode-public-key ${node_key} > "${key_file%.*}"_decoded.key
-
-  echo "$(tail -1 "${key_file%.*}"_decoded.key | cut -f2 -d : | xargs)"
 }
 
 search_skip_delete_insert() {
