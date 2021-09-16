@@ -31,10 +31,6 @@ main()  {
   add_aura_grandpa_keys_to_chainspec 2 3 "${NODE1_KEY_FILE}" && echo "Node1 - AURA/GRANDPA key added to ${CHAIN_SPEC_FILE}" || echo "Failed: Node1 - Adding AURA/GRANDPA keys to ${CHAIN_SPEC_FILE}"
   add_aura_grandpa_keys_to_chainspec 3 7 "${NODE2_KEY_FILE}" && echo "Node2 - AURA/GRANDPA key added to ${CHAIN_SPEC_FILE}" || echo "Failed: Node2 - Adding AURA/GRANDPA keys to ${CHAIN_SPEC_FILE}"
 
-  # Remove palletBalances section
-#  sed -i '/palletBalances/,+51d' "${CHAIN_SPEC_FILE}" && echo "PalletBalances sections removed from ${CHAIN_SPEC_FILE}" || echo "Failed: removing PalletBalances ${CHAIN_SPEC_FILE}"
-#  search_skip_delete_insert "palletSudo" 1 1 '"key": "'$(get_public_key_ss58 ${NODE1_KEY_FILE})''"' "${CHAIN_SPEC_FILE}"
-
   # Add node1 & node2 peer_id vectors to chainSpec.json
   node1_ss58_key="$(get_public_key_ss58 ${NODE1_KEY_FILE})"
   node2_ss58_key=$(get_public_key_ss58 "${NODE2_KEY_FILE}")
@@ -48,8 +44,8 @@ main()  {
   node2_node_key="$(get_node_key ${NODE2_KEY_FILE})"
 
   # Start node1 and node2
-  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
-  rm -rf /tmp/two && echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
+  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS /app/&
+  rm -rf /tmp/two && echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS /app/&
 
   sleep 10 # Wait for the nodes to start
 
@@ -63,7 +59,7 @@ main()  {
   kill "$(ps aux | grep "$node1_node_key" | awk '{print $2}' | head -1)" && echo "Node1 stopped"
   kill "$(ps aux | grep "$node2_node_key" | awk '{print $2}' | head -1)" && echo "Node2 stopped"
   echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
-  echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
+  echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS > /dev/null 2>&1 &
 
   wait
 }
