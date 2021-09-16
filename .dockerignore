@@ -18,10 +18,11 @@ shell.nix
 **/docs
 /scripts/init.sh
 /scripts/docker_run.sh
-*.key
-*Spec.json
 
 # Local build artifacts
 **/target
 node-key
+/data
+*.key
+*Spec.json
 

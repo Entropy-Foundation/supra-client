@@ -2,6 +2,8 @@
 
 # shellcheck disable=SC2039
 
+VOLUME="data"
+
 usage()
 {
 cat << EOF
@@ -72,21 +74,30 @@ main()  {
     supra_executable="target/release/supra"
   fi
 
+  if [ ! -d "$VOLUME" ]; then
+    mkdir -p "$VOLUME" || echo "$VOLUME could not be created"
+  fi
+
   if [ "$is_bootnode" = "true" ]; then
-    # TODO:
-    # Store the peer_id of "one" as a file - inside a docker volume
-    # Copy the rawChainSpec file inside docker volume
-    ./scripts/create-authority-nodes.sh "$supra_executable"
+    ./scripts/create-authority-nodes.sh "$supra_executable" "$VOLUME"
   elif [ -z "$bootnode" ] || [ -z "$chain_spec_file" ]; then
     echo "Both --bootnode and --chain-spec details must be provided"
     usage
     exit 1
   else
-    # TODO:
-    # Store the auth_node.key - inside a docker volume
-    subkey generate --scheme sr25519 > auth_node.key
-    local node_key=$(sed -n 3p auth_node.key | cut -f2 -d : | xargs)
+    local auth_node_file="$VOLUME/auth_node.key"
+    subkey generate --scheme sr25519 > "$auth_node_file"
+    local node_key
+    node_key=$(sed -n 3p "$auth_node_file" | cut -f2 -d : | xargs)
     node_key=${node_key##0x}
+
+    echo >> "$auth_node_file"
+    echo "owner: AccountId: 0x$node_key" >> "$auth_node_file"
+
+    local peer_id
+    peer_id="$($supra_executable decode-public-key $node_key | sed -n 3p | cut -f2 -d : | xargs)"
+    echo "node: PeerId: 0x$peer_id" >> "$auth_node_file"
+
     rm -rf /tmp/auth && "$supra_executable" \
       --base-path /tmp/auth \
       --chain "$chain_spec_file" \

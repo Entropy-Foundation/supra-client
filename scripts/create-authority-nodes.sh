@@ -7,15 +7,14 @@ NODE2_RPC_PORT=9934
 NODE_COMMON_PARAMS="--no-prometheus --no-telemetry --rpc-methods Unsafe --rpc-cors all"
 
 # Output files
-NODE1_KEY_FILE="node1.key"
+NODE1_KEY_FILE="bootnode.key"
 NODE2_KEY_FILE="node2.key"
 CHAIN_SPEC_FILE="chainSpec.json"
 RAW_CHAIN_SPEC_FILE="rawChainSpec.json"
 
 main()  {
-  # TODO:
-  # Check if `local` works inside docker containers
-  local supra=$1
+  local supra="$1"
+  local out_dir="$2"
   local pass_phrase
   local node1_ss58_key
   local node2_ss58_key
@@ -23,6 +22,14 @@ main()  {
   local node2_node_key
   local gran_key
   local peer_id_vec
+
+  # Create Output directory if it does not exist
+  if [ ! -d "$out_dir" ]; then
+    mkdir -p "$out_dir"
+  fi
+
+  NODE1_KEY_FILE="$out_dir/$NODE1_KEY_FILE"
+  RAW_CHAIN_SPEC_FILE="$out_dir/$RAW_CHAIN_SPEC_FILE"
 
   # Generate the default chainSpec.json
   ${supra} build-spec --disable-default-bootnode --chain local > "${CHAIN_SPEC_FILE}" 2> /dev/null && echo "Generated ${CHAIN_SPEC_FILE}"
@@ -44,8 +51,8 @@ main()  {
   node2_node_key="$(get_node_key ${NODE2_KEY_FILE})"
 
   # Start node1 and node2
-  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS /app/&
-  rm -rf /tmp/two && echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS /app/&
+  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
+  rm -rf /tmp/two && echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
 
   sleep 10 # Wait for the nodes to start
 
