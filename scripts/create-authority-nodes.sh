@@ -31,8 +31,9 @@ main()  {
   add_aura_grandpa_keys_to_chainspec 2 3 "${NODE1_KEY_FILE}" && echo "Node1 - AURA/GRANDPA key added to ${CHAIN_SPEC_FILE}" || echo "Failed: Node1 - Adding AURA/GRANDPA keys to ${CHAIN_SPEC_FILE}"
   add_aura_grandpa_keys_to_chainspec 3 7 "${NODE2_KEY_FILE}" && echo "Node2 - AURA/GRANDPA key added to ${CHAIN_SPEC_FILE}" || echo "Failed: Node2 - Adding AURA/GRANDPA keys to ${CHAIN_SPEC_FILE}"
 
-  # Remove palletBalances & palletSudo sections
-  sed -i '/palletBalances/,+54d' "${CHAIN_SPEC_FILE}" && echo "PalletBalances & PalletSudo sections removed from ${CHAIN_SPEC_FILE}" || echo "Failed: removing PalletBalances & PalletSudo ${CHAIN_SPEC_FILE}"
+  # Remove palletBalances section
+#  sed -i '/palletBalances/,+51d' "${CHAIN_SPEC_FILE}" && echo "PalletBalances sections removed from ${CHAIN_SPEC_FILE}" || echo "Failed: removing PalletBalances ${CHAIN_SPEC_FILE}"
+#  search_skip_delete_insert "palletSudo" 1 1 '"key": "'$(get_public_key_ss58 ${NODE1_KEY_FILE})''"' "${CHAIN_SPEC_FILE}"
 
   # Add node1 & node2 peer_id vectors to chainSpec.json
   node1_ss58_key="$(get_public_key_ss58 ${NODE1_KEY_FILE})"
