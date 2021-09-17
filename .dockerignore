@@ -16,9 +16,13 @@ LICENSE
 *.md
 shell.nix
 **/docs
-**/scripts
+/scripts/init.sh
+/scripts/docker_run.sh
 
 # Local build artifacts
 **/target
 node-key
+/data
+*.key
+*Spec.json
 
