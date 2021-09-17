@@ -53,7 +53,7 @@ FROM debian:buster-slim as runtime
 COPY --from=builder /usr/local/bin/supra /usr/local/bin/
 COPY --from=builder /usr/local/bin/sub* /usr/local/bin/
 WORKDIR /app
-COPY --from=planner /app/scripts/create-authority-nodes.sh scripts/
+COPY --from=planner /app/scripts/create-bootnode.sh scripts/
 COPY --from=builder /app/docker.script.sh start
 RUN apt-get update && apt-get install -y curl procps
 EXPOSE 30333 9933 9944

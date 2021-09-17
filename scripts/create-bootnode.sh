@@ -4,6 +4,7 @@
 
 NODE1_RPC_PORT=9933
 NODE2_RPC_PORT=9934
+NODE1_WS_PORT=9944
 NODE_COMMON_PARAMS="--no-prometheus --no-telemetry --rpc-methods Unsafe --rpc-cors all"
 
 # Output files
@@ -39,19 +40,19 @@ main()  {
   add_aura_grandpa_keys_to_chainspec 3 7 "${NODE2_KEY_FILE}" && echo "Node2 - AURA/GRANDPA key added to ${CHAIN_SPEC_FILE}" || echo "Failed: Node2 - Adding AURA/GRANDPA keys to ${CHAIN_SPEC_FILE}"
 
   # Add node1 & node2 peer_id vectors to chainSpec.json
-  node1_ss58_key="$(get_public_key_ss58 ${NODE1_KEY_FILE})"
-  node2_ss58_key=$(get_public_key_ss58 "${NODE2_KEY_FILE}")
+  node1_ss58_key="$(get_public_key_ss58 "${NODE1_KEY_FILE}")"
+  node2_ss58_key="$(get_public_key_ss58 "${NODE2_KEY_FILE}")"
   add_peer_id_vec_to_chainspec 3 "${node1_ss58_key}" "${NODE1_KEY_FILE}" && echo "Node1 - Added PeerID to ${CHAIN_SPEC_FILE}" || echo "Failed: Node1 - Adding PeerID to ${CHAIN_SPEC_FILE}"
   add_peer_id_vec_to_chainspec 7 "${node2_ss58_key}" "${NODE2_KEY_FILE}" && echo "Node2 - Added PeerID to ${CHAIN_SPEC_FILE}" || echo "Failed: Node2 - Adding PeerID to ${CHAIN_SPEC_FILE}"
 
   # Generate the rawChainSpec.json
   ${supra} build-spec --chain="${CHAIN_SPEC_FILE}" --raw --disable-default-bootnode > "${RAW_CHAIN_SPEC_FILE}" 2> /dev/null && echo "Generated ${RAW_CHAIN_SPEC_FILE}"
 
-  node1_node_key="$(get_node_key ${NODE1_KEY_FILE})"
-  node2_node_key="$(get_node_key ${NODE2_KEY_FILE})"
+  node1_node_key="$(get_node_key "${NODE1_KEY_FILE}")"
+  node2_node_key="$(get_node_key "${NODE2_KEY_FILE}")"
 
   # Start node1 and node2
-  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
+  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port "$NODE1_WS_PORT" --port 30333 $NODE_COMMON_PARAMS &
   rm -rf /tmp/two && echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
 
   sleep 10 # Wait for the nodes to start
@@ -65,7 +66,7 @@ main()  {
   # Restart both the nodes
   kill "$(ps aux | grep "$node1_node_key" | awk '{print $2}' | head -1)" && echo "Node1 stopped"
   kill "$(ps aux | grep "$node2_node_key" | awk '{print $2}' | head -1)" && echo "Node2 stopped"
-  echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
+  echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port "$NODE1_WS_PORT" --port 30333 $NODE_COMMON_PARAMS &
   echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS > /dev/null 2>&1 &
 
   wait
@@ -77,13 +78,13 @@ add_aura_grandpa_keys_to_chainspec() {
   local key_file="$3"
 
   # Node1 - AURA and GRANDPA keys
-  subkey generate --scheme sr25519 > ${key_file}
-  local pass_phrase="$(get_mnemonics ${key_file})"
+  subkey generate --scheme sr25519 > "${key_file}"
+  local pass_phrase="$(get_mnemonics "${key_file}")"
   subkey inspect --scheme ed25519 "${pass_phrase}" > "${key_file%.*}_grandpa.key"
 
   # Node1 - Parse out the Aura & Grandpa Public Keys
-  local node1_ss58_key="$(get_public_key_ss58 ${key_file})"
-  local gran_key="$(get_public_key_ss58 ${key_file%.*}_grandpa.key)"
+  local node1_ss58_key="$(get_public_key_ss58 "${key_file}")"
+  local gran_key="$(get_public_key_ss58 "${key_file%.*}"_grandpa.key)"
 
   # Ugly hack - but reduces code duplication
   if [ "$key_file" = "$NODE1_KEY_FILE" ]; then
@@ -137,29 +138,29 @@ add_key_to_node_keystore() {
   local key_type=$1
   local key_file=$2
   local port=$3
-  local request_body="$(generate_request_body "$key_type" "$(get_mnemonics ${key_file})" "$(get_public_key_hex ${key_file})")"
+  local request_body="$(generate_request_body "$key_type" "$(get_mnemonics "${key_file}")" "$(get_public_key_hex "${key_file}")")"
   curl --location --request POST "http://127.0.0.1:$port" --header 'Content-Type: application/json' --data-raw "$request_body"
 }
 
 get_peer_id(){
-  echo "$(sed -n 2p $1 | cut -f2 -d : | xargs)"
+  echo "$(sed -n 2p "$1" | cut -f2 -d : | xargs)"
 }
 
 get_public_key_hex() {
-  echo "$(sed -n 3p $1 | cut -f2 -d : | xargs)"
+  echo "$(sed -n 3p "$1" | cut -f2 -d : | xargs)"
 }
 
 get_node_key() {
-  local node_key="$(get_public_key_hex $1)"
+  local node_key="$(get_public_key_hex "$1")"
   echo "${node_key##0x}"
 }
 
 get_public_key_ss58() {
-  echo "$(tail -1 $1 | cut -f2 -d : | xargs)"
+  echo "$(tail -1 "$1" | cut -f2 -d : | xargs)"
 }
 
 get_mnemonics() {
-  echo "$(head -1 $1 | cut -f2 -d : | xargs)"
+  echo "$(head -1 "$1" | cut -f2 -d : | xargs)"
 }
 
 get_peer_id_vector(){
@@ -167,13 +168,13 @@ get_peer_id_vector(){
 }
 
 generate_peer_id_vec() {
-  local key_file=$1
+  local key_file="$1"
 
   # Public key (hex) from `subkey generate --scheme sr25519` = node_key
-  local node_key="$(get_node_key $key_file)"
+  local node_key="$(get_node_key "$key_file")"
 
   # Decode the Node-Key to get PeerID
-  ${supra} decode-public-key ${node_key} > "${key_file%.*}"_decoded.key
+  ${supra} decode-public-key "${node_key}" > "${key_file%.*}"_decoded.key
 }
 
 search_skip_delete_insert() {
@@ -183,7 +184,7 @@ search_skip_delete_insert() {
   local insert_text="$4"
   local file="$5"
 
-  local match_found_line_number="$(grep -n ${search_text} "$file" | cut -f1 -d :)"
+  local match_found_line_number="$(grep -n "${search_text}" "$file" | cut -f1 -d :)"
 
   if [ "$match_found_line_number" -eq 0 ]; then
     return
@@ -202,7 +203,7 @@ search_skip_replace() {
   local replace_text="$3"
   local file="$4"
 
-  local match_found_line_number="$(grep -n ${search_text} "$file" | cut -f1 -d :)"
+  local match_found_line_number="$(grep -n "${search_text}" "$file" | cut -f1 -d :)"
 
   if [ "$match_found_line_number" -eq 0 ]; then
     return
