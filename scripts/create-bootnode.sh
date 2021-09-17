@@ -4,7 +4,7 @@
 
 NODE1_RPC_PORT=9933
 NODE2_RPC_PORT=9934
-NODE1_WS_PORT=9945
+NODE1_WS_PORT=9944
 NODE_COMMON_PARAMS="--no-prometheus --no-telemetry --rpc-methods Unsafe --rpc-cors all"
 
 # Output files
