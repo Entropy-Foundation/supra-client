@@ -79,7 +79,7 @@ main()  {
   fi
 
   if [ "$is_bootnode" = "true" ]; then
-    ./scripts/create-authority-nodes.sh "$supra_executable" "$VOLUME"
+    ./scripts/create-bootnode.sh "$supra_executable" "$VOLUME"
   elif [ -z "$bootnode" ] || [ -z "$chain_spec_file" ]; then
     echo "Both --bootnode and --chain-spec details must be provided"
     usage
