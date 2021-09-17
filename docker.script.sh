@@ -102,7 +102,7 @@ main()  {
       --base-path /tmp/auth \
       --chain "$chain_spec_file" \
       --port 30333 \
-      --ws-port 9945 \
+      --ws-port 9944 \
       --rpc-port 9933 \
       --no-prometheus --no-telemetry \
       --rpc-methods Unsafe \
