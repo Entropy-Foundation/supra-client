@@ -56,5 +56,5 @@ WORKDIR /app
 COPY --from=planner /app/scripts/create-authority-nodes.sh scripts/
 COPY --from=builder /app/docker.script.sh start
 RUN apt-get update && apt-get install -y curl procps
-EXPOSE 30333 9933 9944
+EXPOSE 30333 9933 9945
 ENTRYPOINT ["./start"]

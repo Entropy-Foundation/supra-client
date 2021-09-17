@@ -4,6 +4,7 @@
 
 NODE1_RPC_PORT=9933
 NODE2_RPC_PORT=9934
+NODE1_WS_PORT="$NODE1_WS_PORT"
 NODE_COMMON_PARAMS="--no-prometheus --no-telemetry --rpc-methods Unsafe --rpc-cors all"
 
 # Output files
@@ -51,7 +52,7 @@ main()  {
   node2_node_key="$(get_node_key ${NODE2_KEY_FILE})"
 
   # Start node1 and node2
-  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
+  rm -rf /tmp/one && echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port "$NODE1_WS_PORT" --port 30333 $NODE_COMMON_PARAMS &
   rm -rf /tmp/two && echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS &
 
   sleep 10 # Wait for the nodes to start
@@ -65,7 +66,7 @@ main()  {
   # Restart both the nodes
   kill "$(ps aux | grep "$node1_node_key" | awk '{print $2}' | head -1)" && echo "Node1 stopped"
   kill "$(ps aux | grep "$node2_node_key" | awk '{print $2}' | head -1)" && echo "Node2 stopped"
-  echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port 9945 --port 30333 $NODE_COMMON_PARAMS &
+  echo "Starting - Node1" && ${supra} --rpc-port "$NODE1_RPC_PORT" --node-key "$node1_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --base-path /tmp/one --one --ws-port "$NODE1_WS_PORT" --port 30333 $NODE_COMMON_PARAMS &
   echo "Starting - Node2" && ${supra} --rpc-port "$NODE2_RPC_PORT" --node-key "$node2_node_key" --chain "${RAW_CHAIN_SPEC_FILE}" --bootnodes /ip4/127.0.0.1/tcp/30333/p2p/"$(get_peer_id ${NODE1_KEY_FILE%.*}_decoded.key)" --base-path /tmp/two --two --ws-port 9946 --port 30334 $NODE_COMMON_PARAMS > /dev/null 2>&1 &
 
   wait
