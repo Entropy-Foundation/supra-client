@@ -17,13 +17,13 @@
 
 use crate::cli::{Cli, Subcommand};
 use crate::{chain_spec, service};
-use supra_runtime::Block;
 use sc_cli::{ChainSpec, Role, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
+use supra_runtime::Block;
 
 impl SubstrateCli for Cli {
     fn impl_name() -> String {
-        "Substrate Node".into()
+        "Supra Node".into()
     }
 
     fn impl_version() -> String {
@@ -43,7 +43,7 @@ impl SubstrateCli for Cli {
     }
 
     fn copyright_start_year() -> i32 {
-        2017
+        2021
     }
 
     fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
@@ -144,6 +144,7 @@ pub fn run() -> sc_cli::Result<()> {
                     .into())
             }
         }
+        Some(Subcommand::PeerID(secret_key)) => secret_key.get_peerid(),
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {

@@ -1,8 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 use libp2p_kad::record::Key;
-use supra_runtime::debug::info;
-use supra_runtime::{self, opaque::Block, RuntimeApi};
 use sc_client_api::{blockchain::HeaderBackend, ExecutorProvider, RemoteBackend};
 use sc_executor::native_executor_instance;
 use sc_finality_grandpa::SharedVoterState;
@@ -11,9 +9,12 @@ use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sp_core::Decode;
 use sp_inherents::{InherentDataProviders, ProvideInherentData};
+use sp_std::str;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use supra_runtime::debug::info;
+use supra_runtime::{self, opaque::Block, RuntimeApi};
 
 pub use sc_executor::NativeExecutor;
 
@@ -183,7 +184,6 @@ impl DataMap {
 #[derive(Debug, Clone)]
 struct DhtLocalStorage {
     path: PathBuf,
-    // password: String
 }
 
 /// Builds a new service for a full client.
