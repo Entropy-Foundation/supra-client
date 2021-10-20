@@ -31,7 +31,7 @@ type FullBackend = sc_service::TFullBackend<Block>;
 type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
 
 // TO DO inherent data provider
-pub const INHERENT_IDENTIFIER: sp_inherents::InherentIdentifier = *b"dhtdataM";
+pub const INHERENT_IDENTIFIER: sp_inherents::InherentIdentifier = *b"supraDHT";
 
 impl ProvideInherentData for DataMap {
     fn on_register(&self, _: &InherentDataProviders) -> Result<(), sp_inherents::Error> {
@@ -61,8 +61,10 @@ impl ProvideInherentData for DataMap {
 pub fn build_inherent_data_providers(key: String) -> Result<InherentDataProviders, ServiceError> {
     let providers = InherentDataProviders::new();
 
+    let data = DataMap::new(key.into_bytes());
+
     providers
-        .register_provider(DataMap::new(key.into_bytes()))
+        .register_provider(data)
         .map_err(Into::into)
         .map_err(sp_consensus::error::Error::InherentData)?;
 
@@ -169,6 +171,8 @@ struct DataMap {
     key: Key,
     /// Our value is the best(latest) block hashed parsed to bytes
     value: Vec<u8>,
+    /// Identifier
+    identifier: String,
 }
 
 impl DataMap {
@@ -177,6 +181,7 @@ impl DataMap {
         Self {
             key,
             value: Default::default(),
+            identifier: Default::default(),
         }
     }
 }
@@ -256,6 +261,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
     let data = DataMap {
         key,
         value: block_collected.as_bytes().to_vec(),
+        identifier: str::from_utf8(&INHERENT_IDENTIFIER).unwrap().to_string(),
     };
 
     // parse data into dht

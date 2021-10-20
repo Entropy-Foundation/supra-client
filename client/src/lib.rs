@@ -776,3 +776,12 @@ impl Serialize for GasRequestParam {
         state.end()
     }
 }
+
+sp_api::decl_runtime_apis! {
+	/// 'Clan' API trait used to couple nodes to form Clan.
+	pub trait ClanApi {
+		fn register_peer(peer: sp_core::OpaquePeerId) -> Vec<sp_core::OpaquePeerId>;
+
+		fn threshold_met(threshold: u32) -> bool;
+	}
+}

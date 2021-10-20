@@ -5,6 +5,7 @@ members = [
     'node',
     'pallets/*',
     'runtime',
+    'supra-clan',
 ]
 [profile.release]
 panic = 'unwind'

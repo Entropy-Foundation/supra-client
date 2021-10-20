@@ -57,6 +57,8 @@ pub type Signature = MultiSignature;
 /// to the public key of our transaction signing scheme.
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
+pub type PeerID = sp_core::OpaquePeerId;
+
 /// The type for looking up accounts. We don't expect more than 4 billion of them, but you
 /// never know...
 pub type AccountIndex = u32;
@@ -128,6 +130,8 @@ pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
+
+pub const CLAN_CAP: usize = 21;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -540,6 +544,21 @@ impl_runtime_apis! {
             len: u32,
         ) -> pallet_transaction_payment::FeeDetails<Balance> {
             TransactionPayment::query_fee_details(uxt, len)
+        }
+    }
+
+    impl client::ClanApi<Block> for Runtime {
+        fn register_peer(peer: PeerID) -> Vec<sp_core::OpaquePeerId> {
+            // Make provision for panic. Documentation says it might "...make the vector reallocate"
+            let mut clan = Vec::with_capacity(21);
+            if clan.len() != CLAN_CAP {
+                clan.push(peer)
+            }
+            clan
+        }
+
+		fn threshold_met(threshold: u32) -> bool {
+            true
         }
     }
 
