@@ -425,15 +425,40 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
     )?;
 
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
-        sc_service::build_network(sc_service::BuildNetworkParams {
-            config: &config,
-            client: client.clone(),
-            transaction_pool: transaction_pool.clone(),
-            spawn_handle: task_manager.spawn_handle(),
-            import_queue,
-            on_demand: Some(on_demand.clone()),
-            block_announce_validator_builder: None,
-        })?;
+    sc_service::build_network(sc_service::BuildNetworkParams {
+        config: &config,
+        client: client.clone(),
+        transaction_pool: transaction_pool.clone(),
+        spawn_handle: task_manager.spawn_handle(),
+        import_queue,
+        on_demand: None,
+        block_announce_validator_builder: None,
+    })?;
+
+     // Current best block at initialization, to report to the RPC layer.
+     let last_hash = client.info().finalized_hash;
+     let block_collected = format!("{}", last_hash.clone());
+     info!("Current block saved to peer DHT {:?}", block_collected);
+ 
+     //define batch key as_bytes
+     let current_block_number: u32 = client.info().finalized_number;
+ 
+     let parsed_block_number = format!("{}", current_block_number.clone());
+ 
+     info!("DHT record key {:?}", &parsed_block_number);
+     let key = Key::from(parsed_block_number.as_bytes().to_vec());
+ 
+     let data = DataMap {
+         key,
+         value: block_collected.as_bytes().to_vec(),
+     };
+ 
+     // parse data into dht
+     network.put_value(data.key.clone(), data.value);
+ 
+     network.get_value(&data.key.clone());
+
+   
 
     if config.offchain_worker.enabled {
         #[cfg(feature = "light-client")]
