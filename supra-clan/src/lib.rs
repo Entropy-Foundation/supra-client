@@ -6,12 +6,11 @@
 use frame_support::{
     debug, decl_error, decl_event, decl_module, decl_storage, dispatch::DispatchResult, ensure, traits::{EnsureOrigin, Get}
 };
-use frame_system::{
-    ensure_none, ensure_root, ensure_signed
-};
 
-use std::collections::VecDeque;
 use sp_core::OpaquePeerId as PeerId;
+// use uuid::Uuid;
+
+use sp_std::collections::btree_set::BTreeSet;
 
 #[cfg(test)]
 mod mock;
@@ -29,15 +28,20 @@ pub trait Config: frame_system::Config {
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 
     type MaxClanNodes: Get<u32>;
-
     /// The origin which can add a well known node.
-    type EnsureOrigin: EnsureOrigin<Self::Origin>;
+    type CheckOrigin: EnsureOrigin<Self::Origin>;
 }
 
 decl_storage! {
 	trait Store for Module<T: Config> as SupraClan {
         /// Set of nodes comprising of nodes in a clan
-        pub Clan get(fn clan_nodes): VecDeque<PeerId>;
+        pub Clan get(fn clan_nodes): BTreeSet<PeerId>;
+    }
+    add_extra_genesis {
+        config(nodes): PeerId;
+        build(|config: &GenesisConfig| {
+            <Module<T>>::form_clan(config.nodes.clone()).unwrap();
+        })
     }
 }
 
@@ -47,6 +51,8 @@ decl_event! {
     where
         AccountId = <T as frame_system::Config>::AccountId,
     {
+        /// Clan is initiated 
+        FormClan,
         /// Event submitted when a node joins the clan.
         JoinClan(Option<AccountId>, PeerId),
         /// Event sunmitted when a node leaves the clan
@@ -62,6 +68,7 @@ decl_error! {
         TooManyNodes,
         /// Nodes already in Clan
         AlreadyJoined,
+        NotInClan,
 	}
 }
 
@@ -72,16 +79,42 @@ decl_module! {
         fn deposit_event() = default;
 
         #[weight = 1000]
-        pub fn add_node_to_clan(origin, node: PeerId) -> DispatchResult {
-            T::EnsureOrigin::ensure_origin(origin)?;
+        pub fn clan_form(origin, node: PeerId) -> DispatchResult {
+            T::CheckOrigin::ensure_origin(origin)?;
+
+            Self::form_clan(node).unwrap();
+
+            Self::deposit_event(RawEvent::FormClan);
+
+            Ok(())
+        }
+
+        #[weight = 1000]
+        pub fn node_join_clan(origin, node: PeerId) -> DispatchResult {
+            T::CheckOrigin::ensure_origin(origin)?;
 
             let mut nodes = Clan::get();
             ensure!(nodes.len() < T::MaxClanNodes::get() as usize, Error::<T>::TooManyNodes);
             ensure!(!nodes.contains(&node), Error::<T>::AlreadyJoined);
 
-            let clan_current_nodes_amount = T::MaxClanNodes::get() as usize;
+            nodes.insert(node.clone());
 
-            nodes.insert(clan_current_nodes_amount, node.clone());
+            Clan::put(&nodes);
+
+            Self::deposit_event(RawEvent::JoinClan(None, node));
+
+            Ok(())
+        }
+
+        #[weight = 1000]
+        pub fn node_leave_clan(origin, node: PeerId) -> DispatchResult {
+            T::CheckOrigin::ensure_origin(origin)?;
+
+            let mut nodes = Clan::get();
+            ensure!(nodes.len() < T::MaxClanNodes::get() as usize, Error::<T>::TooManyNodes);
+            ensure!(nodes.contains(&node), Error::<T>::NotInClan);
+
+            nodes.remove(&node);
 
             Clan::put(&nodes);
 
@@ -93,22 +126,24 @@ decl_module! {
 }
 
 impl<T: Config> Module<T> {
-    pub fn form_clan() -> Result<SupraClan, Error<T>> {
-        let clan_id = 1;
-        let nodes: VecDeque<PeerId> = VecDeque::new();
+    pub fn form_clan(node: PeerId) -> Result<SupraClan, Error<T>> {
+        let clan_id = 34; // Uuid::new_v4();
+        let mut nodes: BTreeSet<PeerId> = BTreeSet::new();
+        nodes.insert(node);
+        // nodes;
 
         let clan = SupraClan {
             clan_id,
-            nodes
+            nodes: nodes.clone(),
         };
 
         Ok(clan)
-    }
-	
+    }	
 }
 
+#[derive(Debug, Clone)]
 pub struct SupraClan {
-    clan_id: u32,
-    nodes: VecDeque<PeerId>,
+    clan_id: u32, // Uuid,
+    nodes: BTreeSet<PeerId>,
 }
 

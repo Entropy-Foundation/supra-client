@@ -7455,9 +7455,11 @@ dependencies = [
  "getrandom 0.2.3",
  "parity-scale-codec",
  "scale-info",
+ "serde",
  "sp-core",
  "sp-io",
  "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]
@@ -7497,6 +7499,7 @@ dependencies = [
  "sp-version",
  "substrate-wasm-builder",
  "supra-authorization",
+ "supra-clan",
 ]
 
 [[package]]
