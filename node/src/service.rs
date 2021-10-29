@@ -498,25 +498,6 @@ async fn handle_notification_custom<TBl, TCl>(
 	TBl: BlockT,
 	TCl: Send + Sync + ProvideRuntimeApi<TBl> + BlockchainEvents<TBl> + 'static,
 {
-	// let mut finality_notification_stream = {
-	// 	let mut finality_notification_stream = client.finality_notification_stream().fuse();
-
-	// 	stream::poll_fn(move |cx| {
-	// 		let mut last = None;
-	// 		while let Poll::Ready(Some(item)) =
-	// 			Pin::new(&mut finality_notification_stream).poll_next(cx)
-	// 		{
-	// 			last = Some(item);
-	// 		}
-	// 		if let Some(last) = last {
-	// 			Poll::Ready(Some(last))
-	// 		} else {
-	// 			Poll::Pending
-	// 		}
-	// 	})
-	// 	.fuse()
-	// };
-
     let mut imported_blocks_stream = client.import_notification_stream().fuse();
 
 	loop {
@@ -539,15 +520,6 @@ async fn handle_notification_custom<TBl, TCl>(
 				    network.put_value(key, value);
 				}
 			}
-
-			// notification = finality_notification_stream.select_next_some() => {
-			// 	let header_data = notification.header;
-			// 	let number = format!("{:?}", header_data.number());
-			// 	let key = Key::from(number.as_bytes().to_vec());
-			// 	let value = notification.hash.as_ref().to_vec();
-			// 	info!("Key:{:?}, Value:{:?} added in DHT", &key, &value);
-			// 	network.put_value(key, value);
-			// }
 		}
 	}
 }
