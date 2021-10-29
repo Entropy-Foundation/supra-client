@@ -16,18 +16,18 @@
       },
       "palletAura": {
         "authorities": [
-          "5DZgMHfDSPUS3XUWEx6mL6CL6prccSqCSXTGqZFnJrZmZjpk",
-          "5FU2NxWTHMd7NNJW1iQbD789Vr5Cc7Y8bb5TPP9qLnoR2CCf"
+          "5FeRKweQ3Nc4kdPDJkHe9od37xWWht6r13aQTM9fd8k6Thdx",
+          "5EjVsJbUBwHFq5oFpreMHFdz8t5KXsLQXyXNyAxAEmrhRE1b"
         ]
       },
       "palletGrandpa": {
         "authorities": [
           [
-            "5DVVa2Z44SCUjBbWkm9Jm5f9LjYn4jtAzuT2i2YrwzDgmDCZ",
+            "5GaCMUfJcttV4bPE3nFpd8fXt714KjjkXBX1mrvLrmQTFvRQ",
             1
           ],
           [
-            "5HZkmRf2v7RvJFgtyQWMzo2bEMpcaQ9Rh9cUzdqmoEMV9ojJ",
+            "5D9oVqwcfvXzWcQGT5oEQVd6mrH3GGSSi9vXZVTrq25vt3Lm",
             1
           ]
         ]
@@ -90,90 +90,12 @@
       "supraAuthorization": {
         "nodes": [
           [
-            [
-              0,
-              36,
-              8,
-              1,
-              18,
-              32,
-              28,
-              229,
-              240,
-              14,
-              246,
-              232,
-              147,
-              116,
-              175,
-              182,
-              37,
-              241,
-              174,
-              76,
-              21,
-              70,
-              211,
-              18,
-              52,
-              232,
-              126,
-              60,
-              63,
-              81,
-              166,
-              43,
-              145,
-              221,
-              107,
-              250,
-              87,
-              223
-            ],
-            "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+            [0, 36, 8, 1, 18, 32, 210, 181, 118, 24, 220, 138, 223, 67, 218, 104, 133, 239, 14, 190, 5, 116, 115, 248, 230, 146, 137, 158, 213, 251, 202, 3, 115, 166, 212, 130, 203, 213],
+            "5FeRKweQ3Nc4kdPDJkHe9od37xWWht6r13aQTM9fd8k6Thdx"
           ],
           [
-            [
-              0,
-              36,
-              8,
-              1,
-              18,
-              32,
-              218,
-              205,
-              231,
-              113,
-              77,
-              133,
-              81,
-              246,
-              116,
-              184,
-              187,
-              75,
-              84,
-              35,
-              147,
-              131,
-              199,
-              106,
-              43,
-              40,
-              111,
-              164,
-              54,
-              233,
-              59,
-              43,
-              126,
-              178,
-              38,
-              191,
-              77,
-              231
-            ],
-            "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
+            [0, 36, 8, 1, 18, 32, 43, 162, 224, 39, 146, 133, 171, 70, 247, 241, 181, 193, 46, 244, 130, 174, 56, 154, 236, 2, 93, 197, 156, 165, 20, 149, 227, 237, 125, 255, 156, 164],
+            "5EjVsJbUBwHFq5oFpreMHFdz8t5KXsLQXyXNyAxAEmrhRE1b"
           ]
         ]
       }
