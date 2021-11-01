@@ -47,6 +47,8 @@ pub use pallet_template;
 
 pub use client;
 
+pub use supra_clan;
+
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -356,6 +358,17 @@ impl supra_authorization::Config for Runtime {
     type WeightInfo = ();
 }
 
+parameter_types! {
+    pub const MaxClanNodes: u32 = 21;
+}
+
+impl supra_clan::Config for Runtime {
+    type Call = Call;
+    type Event = Event;
+    type MaxClanNodes = MaxClanNodes;
+    type CheckOrigin = EnsureRoot<AccountId>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
     pub enum Runtime where
@@ -374,7 +387,8 @@ construct_runtime!(
         // Include the custom logic from the pallet-template in the runtime.
         TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
         LightClient: client::{Module, Call, Storage, Event<T>, ValidateUnsigned},
-        SupraAuthorization: supra_authorization::{Module, Call, Storage, Event<T>, Config<T>}
+        SupraAuthorization: supra_authorization::{Module, Call, Storage, Event<T>, Config<T>},
+        SupraClan: supra_clan::{Module, Call, Storage, Event<T>},
     }
 );
 
