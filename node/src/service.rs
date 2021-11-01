@@ -439,7 +439,7 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
         transaction_pool: transaction_pool.clone(),
         spawn_handle: task_manager.spawn_handle(),
         import_queue,
-        on_demand: None,
+        on_demand: Some(on_demand.clone()),
         block_announce_validator_builder: None,
     })?;
     
@@ -520,10 +520,12 @@ async fn handle_notification_custom<TBl, TCl>(
                     if arr_batch.len() < 5 {
                         arr_batch.push(value);
                     } else {                        
-                        info!("Key:{:?}, Value:{:?} added in DHT", &key, &value);
+                        
                         arr_batch.push(value);
 
                         let vec_arr = format!("{:?}", arr_batch);                        
+                        info!("Key:{:?}, Value:{:?} added in DHT", &key, &vec_arr);
+                        info!("{:?}", vec_arr);
                         network.put_value(key, vec_arr.as_bytes().to_vec());                        
                         arr_batch.clear();                        
                     }
