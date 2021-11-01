@@ -517,7 +517,7 @@ async fn handle_notification_custom<TBl, TCl>(
 				    let key = Key::from(number.as_bytes().to_vec());
 				    let value = notification.hash.as_ref().to_vec();
 
-                    if arr_batch.len() < 5 {
+                    if arr_batch.len() < 50 {
                         arr_batch.push(value);
                     } else {                        
                         
