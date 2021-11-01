@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use futures::{Stream, StreamExt, stream};
+use futures::{StreamExt};
 use libp2p_kad::record::Key;
 use sc_client_api::{ExecutorProvider, RemoteBackend, blockchain::HeaderBackend};
 use sc_executor::native_executor_instance;
@@ -13,9 +13,7 @@ use sp_core::Decode;
 use sp_inherents::{InherentDataProviders, ProvideInherentData};
 use sp_std::str;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Poll;
 use std::time::Duration;
 use supra_runtime::debug::info;
 use sp_runtime::traits::Block as BlockT;
@@ -500,6 +498,8 @@ async fn handle_notification_custom<TBl, TCl>(
 {
     let mut imported_blocks_stream = client.import_notification_stream().fuse();
 
+    let mut arr_batch = vec![];
+
 	loop {
 		futures::select! {
 
@@ -512,12 +512,21 @@ async fn handle_notification_custom<TBl, TCl>(
 				};
 
 				if notification.is_new_best {
-                    let header_data = notification.header;
-				    let number = format!("{:?}", header_data.number());
+                    
+				    let number = format!("{:?}", notification.header.number());
 				    let key = Key::from(number.as_bytes().to_vec());
 				    let value = notification.hash.as_ref().to_vec();
-				    info!("Key:{:?}, Value:{:?} added in DHT", &key, &value);
-				    network.put_value(key, value);
+
+                    if arr_batch.len() < 5 {
+                        arr_batch.push(value);
+                    } else {                        
+                        info!("Key:{:?}, Value:{:?} added in DHT", &key, &value);
+                        arr_batch.push(value);
+
+                        let vec_arr = format!("{:?}", arr_batch);                        
+                        network.put_value(key, vec_arr.as_bytes().to_vec());                        
+                        arr_batch.clear();                        
+                    }
 				}
 			}
 		}
