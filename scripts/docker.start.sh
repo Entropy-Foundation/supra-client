@@ -8,7 +8,8 @@ usage()
 {
 cat << EOF
 usage: docker run [--start-bootnode] | [--bootnode bootnode_address] [--chain-spec chain_spec_file]
-      --start-bootnode    Starts a bootnode, which you can refer to in other nodes to form a network
+      --start-bootnode    Starts a boot node, which you can refer to in other nodes to form a network
+      --light             Starts a light node, which act as archival node and store transactions as a batch
       --bootnode          Bootnode Address
                           eg - "/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWGAGSn6y9vR4eDQWmX2WndeN4PYtodasXLqPALMeCZtr1"
       --chain-spec        Location of the raw chain spec file on the local system
@@ -23,6 +24,8 @@ main()  {
   fi
 
   local is_bootnode="false"
+  local is_lightnode="false"
+  local node_name
   local bootnode
   local chain_spec_file
   while [ "${#}" -gt 0 ]; do
@@ -31,6 +34,10 @@ main()  {
           is_bootnode="true"
           shift 1
           ;;
+      --light)
+        is_lightnode="true"
+        shift 1
+        ;;
       --bootnode)
           bootnode="$2"
 
@@ -57,6 +64,10 @@ main()  {
 
           shift 2
           ;;
+      --name)
+        node_name="$2"
+        shift 2
+        ;;
       -h|--help)
           usage
           exit 0
@@ -68,7 +79,7 @@ main()  {
     esac
   done
 
-  # This is so, testing is easier on local systems
+  # This is to make testing is easier on local systems
   local supra_executable="supra"
   if ! command -v supra >/dev/null; then
     supra_executable="target/release/supra"
@@ -84,6 +95,21 @@ main()  {
     echo "Both --bootnode and --chain-spec details must be provided"
     usage
     exit 1
+  elif [ "$is_lightnode" = "true" ]; then
+    "$supra_executable" \
+      --light \
+      --base-path /tmp/auth \
+      --chain "$chain_spec_file" \
+      --port 30333 \
+      --ws-port 9944 \
+      --rpc-port 9933 \
+      --no-prometheus --no-telemetry \
+      --rpc-methods Unsafe \
+      --rpc-cors all \
+      --validator \
+      --name "$node_name" \
+      --node-key "$node_key" \
+      --bootnodes "$bootnode"
   else
     local auth_node_file="$VOLUME/auth_node.key"
     subkey generate --scheme sr25519 > "$auth_node_file"
