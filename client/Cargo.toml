@@ -35,6 +35,7 @@ version = '2.1.1'
 
 [dev-dependencies]
 sp-core = { default-features = false, version = '3.0.0' }
+
 [features]
 default = ['std']
 std = [

@@ -1,10 +1,12 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
+use futures::{StreamExt};
 use libp2p_kad::record::Key;
-use sc_client_api::{blockchain::HeaderBackend, ExecutorProvider, RemoteBackend};
+use sc_client_api::{ExecutorProvider, RemoteBackend, blockchain::HeaderBackend};
 use sc_executor::native_executor_instance;
 use sc_finality_grandpa::SharedVoterState;
 use sc_keystore::LocalKeystore;
+use sc_network::NetworkService;
 use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use sp_core::Decode;
@@ -14,7 +16,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use supra_runtime::debug::info;
+use sp_runtime::traits::Block as BlockT;
+use sc_client_api::BlockchainEvents;
+use sp_api::ProvideRuntimeApi;
 use supra_runtime::{self, opaque::Block, RuntimeApi};
+use sp_api::HeaderT;
 
 pub use sc_executor::NativeExecutor;
 
@@ -118,6 +124,7 @@ pub fn new_partial(
         task_manager.spawn_handle(),
         client.clone(),
     );
+    
 
     let (grandpa_block_import, grandpa_link) = sc_finality_grandpa::block_import(
         client.clone(),
@@ -129,6 +136,8 @@ pub fn new_partial(
         grandpa_block_import.clone(),
         client.clone(),
     );
+
+    
 
     let import_queue = sc_consensus_aura::import_queue::<_, _, _, AuraPair, _, _>(
         sc_consensus_aura::slot_duration(&*client)?,
@@ -239,6 +248,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
     }
 
     config.network.enable_dht_random_walk = true;
+    
 
     // Current best block at initialization, to report to the RPC layer.
     let last_hash = client.info().finalized_hash;
@@ -258,8 +268,6 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
         value: block_collected.as_bytes().to_vec(),
     };
 
-    // parse data into dht
-    network.put_value(data.key.clone(), data.value);
 
     network.get_value(&data.key.clone());
 
@@ -425,16 +433,16 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
     )?;
 
     let (network, network_status_sinks, system_rpc_tx, network_starter) =
-        sc_service::build_network(sc_service::BuildNetworkParams {
-            config: &config,
-            client: client.clone(),
-            transaction_pool: transaction_pool.clone(),
-            spawn_handle: task_manager.spawn_handle(),
-            import_queue,
-            on_demand: Some(on_demand.clone()),
-            block_announce_validator_builder: None,
-        })?;
-
+    sc_service::build_network(sc_service::BuildNetworkParams {
+        config: &config,
+        client: client.clone(),
+        transaction_pool: transaction_pool.clone(),
+        spawn_handle: task_manager.spawn_handle(),
+        import_queue,
+        on_demand: Some(on_demand.clone()),
+        block_announce_validator_builder: None,
+    })?;
+    
     if config.offchain_worker.enabled {
         #[cfg(feature = "light-client")]
         {
@@ -455,6 +463,11 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
         );
     }
 
+    task_manager.spawn_handle().spawn_blocking(
+		"custom-notification",
+		handle_notification_custom(client.clone(), network.clone()),
+	);
+
     sc_service::spawn_tasks(sc_service::SpawnTasksParams {
         remote_blockchain: Some(backend.remote_blockchain()),
         transaction_pool,
@@ -470,7 +483,54 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
         system_rpc_tx,
     })?;
 
+
     network_starter.start_network();
 
     Ok(task_manager)
+}
+
+async fn handle_notification_custom<TBl, TCl>(
+	client: Arc<TCl>,
+	network: Arc<NetworkService<TBl, <TBl as BlockT>::Hash>>,
+) where
+	TBl: BlockT,
+	TCl: Send + Sync + ProvideRuntimeApi<TBl> + BlockchainEvents<TBl> + 'static,
+{
+    let mut imported_blocks_stream = client.import_notification_stream().fuse();
+
+    let mut arr_batch = vec![];
+
+	loop {
+		futures::select! {
+
+            notification = imported_blocks_stream.next() => {
+				let notification = match notification {
+					Some(n) => n,
+					// If this stream is shut down, that means the client has shut down, and the
+					// most appropriate thing to do for the network future is to shut down too.
+					None => return,
+				};
+
+				if notification.is_new_best {
+                    
+				    let number = format!("{:?}", notification.header.number());
+				    let key = Key::from(number.as_bytes().to_vec());
+				    let value = notification.hash.as_ref().to_vec();
+
+                    if arr_batch.len() < 50 {
+                        arr_batch.push(value);
+                    } else {                        
+                        
+                        arr_batch.push(value);
+
+                        let vec_arr = format!("{:?}", arr_batch);                        
+                        info!("Key:{:?}, Value:{:?} added in DHT", &key, &vec_arr);
+                        info!("{:?}", vec_arr);
+                        network.put_value(key, vec_arr.as_bytes().to_vec());                        
+                        arr_batch.clear();                        
+                    }
+				}
+			}
+		}
+	}
 }

@@ -75,6 +75,46 @@ pub fn development_config() -> Result<ChainSpec, String> {
     ))
 }
 
+pub fn supra_config() -> Result<ChainSpec, String> {
+    let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
+
+    Ok(ChainSpec::from_genesis(
+        // Name
+        "Supra",
+        // ID
+        "supra",
+        ChainType::Custom(String::from("Supra")),
+        move || {
+            testnet_genesis(
+                wasm_binary,
+                // Initial PoA authorities
+                vec![
+                    authority_keys_from_seed("0xc8c157749a3f500000e6e5b92de459b4a609e50ece5c036abbf43006ced4d111"),
+                ],
+                // Sudo account
+                get_account_id_from_seed::<sr25519::Public>("0xc8c157749a3f500000e6e5b92de459b4a609e50ece5c036abbf43006ced4d111"),
+                // Pre-funded accounts
+                vec![
+                    get_account_id_from_seed::<sr25519::Public>("0xc8c157749a3f500000e6e5b92de459b4a609e50ece5c036abbf43006ced4d111"),
+                    get_account_id_from_seed::<sr25519::Public>("Alice"),
+                    get_account_id_from_seed::<sr25519::Public>("Bob"),
+                ],
+                true,
+            )
+        },
+        // Bootnodes
+        vec![],
+        // Telemetry
+        None,
+        // Protocol ID
+        None,
+        // Properties
+        None,
+        // Extensions
+        None,
+    ))
+}
+
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
     let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
 
@@ -164,7 +204,7 @@ fn testnet_genesis(
             nodes: vec![
                 (
                     OpaquePeerId(
-                        bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2")
+                        bs58::decode("12D3KooWCPow32NJx3Jo87jpXSPmPUwDct6sNZSVBHzGeTJY1uB9")
                             .into_vec()
                             .unwrap(),
                     ),
@@ -172,7 +212,7 @@ fn testnet_genesis(
                 ),
                 (
                     OpaquePeerId(
-                        bs58::decode("12D3KooWQYV9dGMFoRzNStwpXztXaBUjtPqi6aU76ZgUriHhKust")
+                        bs58::decode("12D3KooWRqAe5uRWY9zFRb83StW6s11iPtgTWvHX5Bf9zP379FYf")
                             .into_vec()
                             .unwrap(),
                     ),
